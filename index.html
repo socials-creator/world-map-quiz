@@ -13,61 +13,40 @@
 
 <div class="app">
 
+  <!-- ===== Always-visible top bar: brand + hamburger (secondary info only) ===== -->
   <header class="topbar">
     <div class="brand">
       <span class="brand-mark">🌐</span>
       <span class="brand-name">Where in the World</span>
     </div>
-    <div class="topbar-stats">
-      <div class="stat">
-        <span class="stat-label">Score</span>
-        <span class="stat-value" id="live-score">0 / 0</span>
-      </div>
-      <div class="stat">
-        <span class="stat-label">Question</span>
-        <span class="stat-value" id="live-question">— / —</span>
-      </div>
-    </div>
-    <button class="btn-icon" id="menu-toggle" aria-label="Toggle menu">☰</button>
+    <button class="btn-icon" id="menu-toggle" aria-label="Open high score & info">☰</button>
   </header>
 
+  <!-- ===== Always-visible control row: New Game + live stats (core loop, never hidden) ===== -->
+  <div class="control-row">
+    <button class="btn-primary" id="new-game-btn">New game</button>
+    <div class="live-stats">
+      <div class="stat"><span class="stat-label">Found</span><span class="stat-value" id="live-score">0</span></div>
+      <div class="stat"><span class="stat-label">Missed</span><span class="stat-value" id="live-mistakes">0 / 5</span></div>
+      <div class="stat"><span class="stat-label">Remaining</span><span class="stat-value" id="live-remaining">—</span></div>
+    </div>
+  </div>
+
+  <!-- ===== Always-visible last-10-games strip ===== -->
+  <div class="history-strip">
+    <span class="history-strip-label">Last 10 games</span>
+    <ol class="history-scroller" id="history-list">
+      <li class="history-empty">No games yet — play one to see it here.</li>
+    </ol>
+  </div>
+
   <div class="layout">
-
-    <aside class="sidebar" id="sidebar">
-
-      <section class="panel">
-        <h2 class="panel-title">Play</h2>
-        <p class="panel-copy">Find each country by tapping it on the map. Stay sharp — we usually keep you exploring one region, then jump you somewhere new.</p>
-        <button class="btn-primary" id="new-game-btn">New game</button>
-        <button class="btn-ghost" id="skip-btn" disabled>Skip this country</button>
-      </section>
-
-      <section class="panel">
-        <h2 class="panel-title">Highest score ever</h2>
-        <div class="high-score" id="high-score-display">
-          <span class="high-score-number" id="high-score-number">0</span>
-          <span class="high-score-out-of" id="high-score-outof">/ 0</span>
-        </div>
-      </section>
-
-      <section class="panel">
-        <h2 class="panel-title">Last 10 games</h2>
-        <ol class="history-list" id="history-list">
-          <li class="history-empty">No games yet — play one to see it here.</li>
-        </ol>
-      </section>
-
-      <p class="map-note">
-        Borders shown are simplified reference boundaries for gameplay, not a political
-        statement on any disputed territory.
-      </p>
-
-    </aside>
 
     <main class="map-stage">
       <div class="prompt-card" id="prompt-card">
         <span class="prompt-label" id="prompt-label">Press New Game to start</span>
         <span class="prompt-country" id="prompt-country">🌍</span>
+        <button class="skip-chip" id="skip-btn" disabled>Skip this country →</button>
       </div>
 
       <div class="feedback-toast" id="feedback-toast"></div>
@@ -81,13 +60,47 @@
       </div>
     </main>
 
+    <!-- ===== Secondary drawer: High score + About/legend — one tap away, not core loop ===== -->
+    <aside class="drawer" id="sidebar">
+      <button class="btn-icon drawer-close" id="drawer-close" aria-label="Close">✕</button>
+
+      <section class="panel">
+        <h2 class="panel-title">Highest score ever</h2>
+        <div class="high-score">
+          <span class="high-score-number" id="high-score-number">0</span>
+          <span class="high-score-out-of" id="high-score-outof">countries</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel-title">How a round works</h2>
+        <p class="panel-copy">
+          Tap the country you're shown. A round keeps you exploring one continent,
+          then occasionally jumps you somewhere new. It ends when you've placed
+          every country — or after 5 misses, whichever comes first.
+        </p>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel-title">Map legend</h2>
+        <p class="panel-copy">
+          <span class="legend-swatch"></span> Disputed regions (e.g. Aksai Chin,
+          Pakistan-administered Kashmir) are shown in grey and aren't part of the
+          quiz — borders here are simplified reference lines, not a political
+          statement.
+        </p>
+      </section>
+    </aside>
+
   </div>
 </div>
+
+<div class="drawer-scrim" id="drawer-scrim"></div>
 
 <div class="result-overlay" id="result-overlay">
   <div class="result-card">
     <h2 id="result-title">Game complete</h2>
-    <p class="result-score" id="result-score">0 / 0</p>
+    <p class="result-score" id="result-score">0</p>
     <p class="result-copy" id="result-copy"></p>
     <button class="btn-primary" id="play-again-btn">Play again</button>
     <button class="btn-ghost" id="close-result-btn">Close</button>

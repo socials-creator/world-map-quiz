@@ -1,21 +1,55 @@
 /* ============================================================
-   Where in the World — geography pointing game
+   Where in the World — geography pointing game (V2)
    Data: Natural Earth via world-atlas (CDN), TopoJSON
    ============================================================ */
 
 const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
-const QUESTIONS_PER_GAME = 15;
+const MAX_MISTAKES = 5;
 const SAME_CONTINENT_PROBABILITY = 0.72; // chance the next country stays in-region
 
-const STORAGE_HISTORY_KEY = "geoGame.history.v1";
-const STORAGE_HIGH_KEY = "geoGame.highScore.v1";
+const STORAGE_HISTORY_KEY = "geoGame.history.v2";
+const STORAGE_HIGH_KEY = "geoGame.highScore.v2";
+
+/* ---------- Rough, simplified outlines for regions whose sovereignty is
+   disputed between neighboring countries. Drawn as a neutral grey overlay,
+   excluded from the quiz. Coordinates are deliberately simplified — this is
+   a gameplay aid, not a legal/political boundary reference. ---------- */
+
+const DISPUTED_REGIONS = [
+  {
+    name: "Aksai Chin",
+    coordinates: [[[
+      [78.35, 34.95], [78.85, 34.35], [79.45, 34.05], [80.15, 34.25],
+      [80.45, 34.85], [80.05, 35.35], [79.35, 35.55], [78.65, 35.30],
+      [78.35, 34.95]
+    ]]]
+  },
+  {
+    name: "Pakistan-administered Kashmir",
+    coordinates: [[[
+      [73.00, 33.75], [73.95, 33.35], [74.85, 33.55], [75.75, 34.30],
+      [76.85, 34.95], [77.05, 35.95], [76.55, 36.75], [75.55, 36.95],
+      [74.35, 36.75], [73.35, 36.00], [72.75, 34.85], [73.00, 33.75]
+    ]]]
+  }
+];
+
+const disputedFeatureCollection = {
+  type: "FeatureCollection",
+  features: DISPUTED_REGIONS.map(r => ({
+    type: "Feature",
+    properties: { name: r.name },
+    geometry: { type: "Polygon", coordinates: r.coordinates }
+  }))
+};
 
 /* ---------- DOM refs ---------- */
 
 const els = {
   map: document.getElementById("map"),
   liveScore: document.getElementById("live-score"),
-  liveQuestion: document.getElementById("live-question"),
+  liveMistakes: document.getElementById("live-mistakes"),
+  liveRemaining: document.getElementById("live-remaining"),
   newGameBtn: document.getElementById("new-game-btn"),
   skipBtn: document.getElementById("skip-btn"),
   promptLabel: document.getElementById("prompt-label"),
@@ -31,7 +65,9 @@ const els = {
   playAgainBtn: document.getElementById("play-again-btn"),
   closeResultBtn: document.getElementById("close-result-btn"),
   menuToggle: document.getElementById("menu-toggle"),
-  sidebar: document.getElementById("sidebar"),
+  drawer: document.getElementById("sidebar"),
+  drawerClose: document.getElementById("drawer-close"),
+  drawerScrim: document.getElementById("drawer-scrim"),
   zoomIn: document.getElementById("zoom-in"),
   zoomOut: document.getElementById("zoom-out"),
   zoomReset: document.getElementById("zoom-reset"),
@@ -46,6 +82,8 @@ const svg = d3.select("#map").append("svg")
   .attr("viewBox", `0 0 ${width} ${height}`);
 
 const g = svg.append("g");
+const countryLayer = g.append("g").attr("class", "country-layer");
+const disputedLayer = g.append("g").attr("class", "disputed-layer");
 
 const projection = d3.geoNaturalEarth1();
 const path = d3.geoPath(projection);
@@ -65,7 +103,8 @@ window.addEventListener("resize", () => {
   height = els.map.clientHeight;
   svg.attr("viewBox", `0 0 ${width} ${height}`);
   projection.fitSize([width, height], { type: "Sphere" });
-  g.selectAll("path.country").attr("d", path);
+  countryLayer.selectAll("path.country").attr("d", path);
+  disputedLayer.selectAll("path.disputed-region").attr("d", path);
 });
 
 /* ---------- Palette for neighbor-safe coloring ---------- */
@@ -101,9 +140,10 @@ let nameOf = [];
 let game = {
   active: false,
   score: 0,
-  answered: 0,
+  mistakes: 0,
   targetIndex: null,
-  order: [],
+  remaining: [],   // indices not yet asked this round
+  asked: [],       // indices already asked this round
 };
 
 /* ---------- Load data ---------- */
@@ -114,13 +154,12 @@ d3.json(WORLD_URL).then((world) => {
   const rawNeighbors = topojson.neighbors(world.objects[objectKey].geometries);
 
   // Filter out entries with no renderable geometry / Antarctica for playability
-  features = collection.features.filter(f => f.geometry && f.properties.name !== "Antarctica");
-
-  // Rebuild neighbor indices to match filtered feature list
   const keepIndex = [];
   collection.features.forEach((f, i) => {
     if (f.geometry && f.properties.name !== "Antarctica") keepIndex.push(i);
   });
+  features = keepIndex.map(i => collection.features[i]);
+
   const oldToNew = new Map(keepIndex.map((oldI, newI) => [oldI, newI]));
   neighborsOf = keepIndex.map((oldI) =>
     rawNeighbors[oldI].filter(n => oldToNew.has(n)).map(n => oldToNew.get(n))
@@ -157,7 +196,7 @@ function assignColors() {
 function drawMap() {
   projection.fitSize([width, height], { type: "Sphere" });
 
-  g.selectAll("path.country")
+  countryLayer.selectAll("path.country")
     .data(features)
     .join("path")
     .attr("class", "country")
@@ -165,6 +204,14 @@ function drawMap() {
     .attr("fill", d => colorForIndex(d.__colorIndex))
     .attr("data-index", (d, i) => i)
     .on("click", (event, d) => handleCountryClick(features.indexOf(d)));
+
+  // Disputed regions: drawn on top, grey, purely visual (clicks pass through
+  // to the country beneath so gameplay is unaffected).
+  disputedLayer.selectAll("path.disputed-region")
+    .data(disputedFeatureCollection.features)
+    .join("path")
+    .attr("class", "disputed-region")
+    .attr("d", path);
 }
 
 /* ---------- Game flow ---------- */
@@ -175,40 +222,45 @@ els.closeResultBtn.addEventListener("click", closeResult);
 els.skipBtn.addEventListener("click", () => {
   if (!game.active) return;
   showToast(`It was ${nameOf[game.targetIndex]}`, "bad");
+  game.mistakes++;
   advance();
 });
 
 function startGame() {
   if (!features.length) return;
-  game = { active: true, score: 0, answered: 0, targetIndex: null, order: [] };
+  game = {
+    active: true,
+    score: 0,
+    mistakes: 0,
+    targetIndex: null,
+    remaining: features.map((_, i) => i),
+    asked: [],
+  };
   els.skipBtn.disabled = false;
   updateLiveStats();
-  pickNext(true);
+  pickNext();
 }
 
-function pickNext(isFirst) {
-  const allIndices = features.map((_, i) => i);
+function pickNext() {
+  if (!game.remaining.length) { endGame("completed"); return; }
+
+  const prev = game.targetIndex;
   let pool;
 
-  if (isFirst || game.targetIndex === null) {
-    pool = allIndices;
+  if (prev === null) {
+    pool = game.remaining;
   } else {
-    const sameContinent = allIndices.filter(
-      i => continentOf[i] === continentOf[game.targetIndex] && !game.order.includes(i)
-    );
+    const sameContinent = game.remaining.filter(i => continentOf[i] === continentOf[prev]);
     const jump = Math.random() > SAME_CONTINENT_PROBABILITY || sameContinent.length === 0;
-    const candidates = jump
-      ? allIndices.filter(i => !game.order.includes(i))
-      : sameContinent;
-    pool = candidates.length ? candidates : allIndices.filter(i => !game.order.includes(i));
+    pool = jump ? game.remaining : sameContinent;
   }
 
-  if (!pool.length) pool = allIndices;
   const next = pool[Math.floor(Math.random() * pool.length)];
   game.targetIndex = next;
-  game.order.push(next);
+  game.remaining = game.remaining.filter(i => i !== next);
+  game.asked.push(next);
 
-  els.promptLabel.textContent = `Find country ${game.order.length} of ${QUESTIONS_PER_GAME}`;
+  els.promptLabel.textContent = `Country ${game.asked.length} of ${features.length}`;
   els.promptCountry.textContent = nameOf[next];
   updateLiveStats();
 }
@@ -217,7 +269,7 @@ function handleCountryClick(clickedIndex) {
   if (!game.active) return;
 
   const target = game.targetIndex;
-  const el = g.select(`path[data-index="${clickedIndex}"]`);
+  const el = countryLayer.select(`path[data-index="${clickedIndex}"]`);
 
   if (clickedIndex === target) {
     game.score++;
@@ -225,41 +277,44 @@ function handleCountryClick(clickedIndex) {
     el.classed("correct-flash", true);
     setTimeout(() => el.classed("correct-flash", false), 500);
   } else {
+    game.mistakes++;
     showToast(`That was ${nameOf[clickedIndex]} — target was ${nameOf[target]}`, "bad");
     el.classed("wrong-flash", true);
-    g.select(`path[data-index="${target}"]`).classed("answer-flash", true);
+    countryLayer.select(`path[data-index="${target}"]`).classed("answer-flash", true);
     setTimeout(() => {
       el.classed("wrong-flash", false);
-      g.select(`path[data-index="${target}"]`).classed("answer-flash", false);
+      countryLayer.select(`path[data-index="${target}"]`).classed("answer-flash", false);
     }, 650);
   }
 
-  game.answered++;
   advance();
 }
 
 function advance() {
   updateLiveStats();
-  if (game.order.length >= QUESTIONS_PER_GAME) {
-    setTimeout(endGame, 500);
+  if (game.mistakes >= MAX_MISTAKES) {
+    setTimeout(() => endGame("mistakes"), 500);
+  } else if (!game.remaining.length) {
+    setTimeout(() => endGame("completed"), 500);
   } else {
-    setTimeout(() => pickNext(false), 500);
+    setTimeout(pickNext, 500);
   }
 }
 
-function endGame() {
+function endGame(reason) {
   game.active = false;
   els.skipBtn.disabled = true;
-  els.promptLabel.textContent = "Game complete";
-  els.promptCountry.textContent = "🏁";
+  els.promptLabel.textContent = reason === "completed" ? "All countries found!" : "Game over";
+  els.promptCountry.textContent = reason === "completed" ? "🏆" : "🏁";
 
-  saveResult(game.score, QUESTIONS_PER_GAME);
-  showResult();
+  saveResult(game.score, game.mistakes, features.length, reason === "completed");
+  showResult(reason);
 }
 
 function updateLiveStats() {
-  els.liveScore.textContent = `${game.score} / ${game.answered}`;
-  els.liveQuestion.textContent = `${Math.min(game.order.length, QUESTIONS_PER_GAME)} / ${QUESTIONS_PER_GAME}`;
+  els.liveScore.textContent = game.score;
+  els.liveMistakes.textContent = `${game.mistakes} / ${MAX_MISTAKES}`;
+  els.liveRemaining.textContent = game.active ? game.remaining.length : "—";
 }
 
 function showToast(msg, kind) {
@@ -273,23 +328,21 @@ function showToast(msg, kind) {
 
 /* ---------- Result overlay ---------- */
 
-function showResult() {
-  const pct = Math.round((game.score / QUESTIONS_PER_GAME) * 100);
-  els.resultTitle.textContent = pct === 100 ? "Perfect round!" : "Game complete";
-  els.resultScore.textContent = `${game.score} / ${QUESTIONS_PER_GAME}`;
-  els.resultCopy.textContent =
-    pct >= 80 ? "Excellent geography instincts." :
-    pct >= 50 ? "Solid round — try another to beat it." :
-    "Every round sharpens your map sense. Go again?";
+function showResult(reason) {
+  els.resultTitle.textContent = reason === "completed" ? "You placed every country!" : "Game over — 5 misses";
+  els.resultScore.textContent = `${game.score} / ${features.length}`;
+  els.resultCopy.textContent = reason === "completed"
+    ? "Every country on the map, found. That's a full round."
+    : "Every round sharpens your map sense. Go again?";
   els.resultOverlay.classList.add("show");
 }
 function closeResult() { els.resultOverlay.classList.remove("show"); }
 
 /* ---------- Persistence ---------- */
 
-function saveResult(score, total) {
+function saveResult(score, mistakes, total, completed) {
   const history = JSON.parse(localStorage.getItem(STORAGE_HISTORY_KEY) || "[]");
-  history.unshift({ score, total, date: new Date().toISOString() });
+  history.unshift({ score, mistakes, total, completed, date: new Date().toISOString() });
   localStorage.setItem(STORAGE_HISTORY_KEY, JSON.stringify(history.slice(0, 10)));
 
   const high = Number(localStorage.getItem(STORAGE_HIGH_KEY) || 0);
@@ -302,7 +355,7 @@ function saveResult(score, total) {
 function loadHighScore() {
   const high = Number(localStorage.getItem(STORAGE_HIGH_KEY) || 0);
   els.highScoreNumber.textContent = high;
-  els.highScoreOutof.textContent = `/ ${QUESTIONS_PER_GAME}`;
+  els.highScoreOutof.textContent = `of ${features.length || "—"} countries`;
 }
 
 function renderHistory() {
@@ -314,11 +367,22 @@ function renderHistory() {
   els.historyList.innerHTML = history.map(h => {
     const d = new Date(h.date);
     const dateStr = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-    return `<li><span class="history-score">${h.score} / ${h.total}</span><span class="history-date">${dateStr}</span></li>`;
+    const cls = h.completed ? "completed" : "";
+    return `<li class="${cls}"><span class="history-score">${h.score}</span><span class="history-date">${dateStr}</span></li>`;
   }).join("");
 }
 
-/* ---------- Mobile sidebar toggle ---------- */
+/* ---------- Secondary drawer (hamburger): High score + About only ---------- */
 
-els.menuToggle.addEventListener("click", () => els.sidebar.classList.toggle("open"));
-els.map.addEventListener("pointerdown", () => els.sidebar.classList.remove("open"));
+function openDrawer() {
+  els.drawer.classList.add("open");
+  els.drawerScrim.classList.add("show");
+}
+function closeDrawer() {
+  els.drawer.classList.remove("open");
+  els.drawerScrim.classList.remove("show");
+}
+els.menuToggle.addEventListener("click", openDrawer);
+els.drawerClose.addEventListener("click", closeDrawer);
+els.drawerScrim.addEventListener("click", closeDrawer);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
