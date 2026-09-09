@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Where in the World — Geography Pointing Game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">🌐</span>
+      <span class="brand-name">Where in the World</span>
+    </div>
+    <div class="topbar-stats">
+      <div class="stat">
+        <span class="stat-label">Score</span>
+        <span class="stat-value" id="live-score">0 / 0</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Question</span>
+        <span class="stat-value" id="live-question">— / —</span>
+      </div>
+    </div>
+    <button class="btn-icon" id="menu-toggle" aria-label="Toggle menu">☰</button>
+  </header>
+
+  <div class="layout">
+
+    <aside class="sidebar" id="sidebar">
+
+      <section class="panel">
+        <h2 class="panel-title">Play</h2>
+        <p class="panel-copy">Find each country by tapping it on the map. Stay sharp — we usually keep you exploring one region, then jump you somewhere new.</p>
+        <button class="btn-primary" id="new-game-btn">New game</button>
+        <button class="btn-ghost" id="skip-btn" disabled>Skip this country</button>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel-title">Highest score ever</h2>
+        <div class="high-score" id="high-score-display">
+          <span class="high-score-number" id="high-score-number">0</span>
+          <span class="high-score-out-of" id="high-score-outof">/ 0</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel-title">Last 10 games</h2>
+        <ol class="history-list" id="history-list">
+          <li class="history-empty">No games yet — play one to see it here.</li>
+        </ol>
+      </section>
+
+      <p class="map-note">
+        Borders shown are simplified reference boundaries for gameplay, not a political
+        statement on any disputed territory.
+      </p>
+
+    </aside>
+
+    <main class="map-stage">
+      <div class="prompt-card" id="prompt-card">
+        <span class="prompt-label" id="prompt-label">Press New Game to start</span>
+        <span class="prompt-country" id="prompt-country">🌍</span>
+      </div>
+
+      <div class="feedback-toast" id="feedback-toast"></div>
+
+      <div id="map" class="map-canvas"></div>
+
+      <div class="zoom-controls">
+        <button id="zoom-in" aria-label="Zoom in">+</button>
+        <button id="zoom-reset" aria-label="Reset zoom">⤾</button>
+        <button id="zoom-out" aria-label="Zoom out">−</button>
+      </div>
+    </main>
+
+  </div>
+</div>
+
+<div class="result-overlay" id="result-overlay">
+  <div class="result-card">
+    <h2 id="result-title">Game complete</h2>
+    <p class="result-score" id="result-score">0 / 0</p>
+    <p class="result-copy" id="result-copy"></p>
+    <button class="btn-primary" id="play-again-btn">Play again</button>
+    <button class="btn-ghost" id="close-result-btn">Close</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+<script src="script.js"></script>
+</body>
+</html>
