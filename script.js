@@ -125,7 +125,7 @@ const MAX_SCALE = 40; // was 10 in V1/V2 — needed to comfortably tap small cou
 
 const zoomBehavior = d3.zoom()
   .scaleExtent([1, MAX_SCALE])
-  .clickTolerance(5)  // any movement < 5px treated as click, not drag — fixes touch detection
+  .clickDistance(5)  // any movement < 5px treated as click, not drag — fixes touch detection
   .on("zoom", (event) => g.attr("transform", event.transform));
 
 svg.call(zoomBehavior).on("dblclick.zoom", null);
