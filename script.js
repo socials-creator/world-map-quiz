@@ -370,6 +370,12 @@
     [...groups]
       .sort((a, b) => b.neighbours.size - a.neighbours.size)
       .forEach(group => {
+        // Countries with no detected land neighbours (most island
+        // nations) have nothing to conflict with — leave them on
+        // their spread-out default color instead of collapsing
+        // every one of them onto palette color 0.
+        if (group.neighbours.size === 0) return;
+
         const used = new Set([...group.neighbours].map(i => groups[i].colorIndex));
         let color = 0;
         while (used.has(color) && color < PALETTE.length - 1) color++;
@@ -408,7 +414,62 @@
   }
 
   /* =========================================================
-     DRAW COUNTRIES — direct click handlers, no overlay layer
+     TAP DETECTION
+
+     We deliberately do NOT use the "click" event. On touch
+     devices, D3's pan/zoom behavior listens for the same
+     pointer/touch gestures, and the browser's synthetic click
+     that normally follows a tap is frequently suppressed by
+     that combination — which is why answers weren't registering.
+     Instead we track pointerdown -> pointerup ourselves and
+     treat it as a tap only if the finger/mouse barely moved and
+     didn't take too long, which works reliably alongside zoom.
+  ========================================================= */
+
+  let pointerDownInfo = null;
+  const TAP_MAX_DISTANCE = 12; // px
+  const TAP_MAX_DURATION = 700; // ms
+
+  function attachTapHandler(selection, resolveGroupIndex) {
+    selection
+      .on("pointerdown", function(event) {
+        pointerDownInfo = {
+          x: event.clientX,
+          y: event.clientY,
+          time: Date.now(),
+          el: this
+        };
+      })
+      .on("pointerup", function(event, d) {
+        if (!pointerDownInfo || pointerDownInfo.el !== this) {
+          pointerDownInfo = null;
+          return;
+        }
+
+        const dx = event.clientX - pointerDownInfo.x;
+        const dy = event.clientY - pointerDownInfo.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const duration = Date.now() - pointerDownInfo.time;
+
+        pointerDownInfo = null;
+
+        if (dist <= TAP_MAX_DISTANCE && duration <= TAP_MAX_DURATION) {
+          event.preventDefault();
+          event.stopPropagation();
+          onCountrySelected(resolveGroupIndex(d));
+        }
+      })
+      .on("pointercancel", () => { pointerDownInfo = null; })
+      .on("click", event => {
+        // Swallow any click that does slip through so it can
+        // never register as a second, duplicate selection.
+        event.preventDefault();
+        event.stopPropagation();
+      });
+  }
+
+  /* =========================================================
+     DRAW COUNTRIES — direct tap handlers, no overlay layer
   ========================================================= */
 
   function drawCountries() {
@@ -423,25 +484,22 @@
       });
     });
 
-    countryLayer.selectAll("path.country")
+    const selection = countryLayer.selectAll("path.country")
       .data(renderFeatures, d => d.__key)
       .join("path")
       .attr("class", "country")
       .attr("d", d => pathGenerator(d))
       .attr("fill", d => colorFor(groups[d.__groupIndex]))
       .attr("data-group", d => d.__groupIndex)
-      .attr("aria-label", d => groups[d.__groupIndex].name)
-      .on("click", (event, d) => {
-        event.preventDefault();
-        event.stopPropagation();
-        onCountrySelected(d.__groupIndex);
-      });
+      .attr("aria-label", d => groups[d.__groupIndex].name);
+
+    attachTapHandler(selection, d => d.__groupIndex);
   }
 
   function drawFallbackPoints() {
     const missingGroups = groups.filter(g => g.features.length === 0 && FALLBACK_POINTS[g.id]);
 
-    fallbackLayer.selectAll("circle")
+    const selection = fallbackLayer.selectAll("circle")
       .data(missingGroups, d => d.id)
       .join("circle")
       .attr("r", 8)
@@ -449,11 +507,9 @@
       .attr("stroke", "#FBFAF6")
       .attr("stroke-width", 1.5)
       .style("cursor", "pointer")
-      .on("click", (event, g) => {
-        event.preventDefault();
-        event.stopPropagation();
-        onCountrySelected(g.index);
-      });
+      .style("touch-action", "none");
+
+    attachTapHandler(selection, g => g.index);
 
     positionFallbackPoints();
   }
