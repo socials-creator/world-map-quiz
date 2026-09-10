@@ -24,7 +24,7 @@
 
   <!-- ===== Always-visible control row: New Game + live stats (core loop, never hidden) ===== -->
   <div class="control-row">
-    <button class="btn-primary" id="new-game-btn" disabled>Loading map…</button>
+    <button class="btn-primary" id="new-game-btn">New game</button>
     <div class="live-stats">
       <div class="stat"><span class="stat-label">Found</span><span class="stat-value" id="live-score">0</span></div>
       <div class="stat"><span class="stat-label">Missed</span><span class="stat-value" id="live-mistakes">0 / 5</span></div>
@@ -46,7 +46,7 @@
       <div class="prompt-card" id="prompt-card">
         <span class="prompt-label" id="prompt-label">Press New Game to start</span>
         <span class="prompt-country" id="prompt-country">🌍</span>
-        <button class="skip-chip" id="skip-btn" disabled>Skip →</button>
+        <button class="skip-chip" id="skip-btn" disabled>Skip this country →</button>
       </div>
 
       <div class="feedback-toast" id="feedback-toast"></div>
@@ -68,33 +68,26 @@
         <h2 class="panel-title">Highest score ever</h2>
         <div class="high-score">
           <span class="high-score-number" id="high-score-number">0</span>
-          <span class="high-score-out-of" id="high-score-outof">of 197 countries</span>
+          <span class="high-score-out-of" id="high-score-outof">countries</span>
         </div>
       </section>
 
       <section class="panel">
         <h2 class="panel-title">How a round works</h2>
         <p class="panel-copy">
-          Tap the country you're shown, from all <strong>197</strong> countries —
-          the UN's 193 members plus Palestine, the Holy See, Kosovo, and Taiwan.
-          Overseas territories (like Greenland, Puerto Rico, or Hong Kong) count
-          as part of their sovereign country rather than as separate quiz answers.
-          A round keeps you exploring one continent, then occasionally jumps you
-          somewhere new. It ends when you've placed every country — or after 5
-          misses, whichever comes first. Miss one or skip it, and the map will
-          pan in and point to where it actually was. Pinch or scroll to zoom in
-          on small countries.
+          Tap the country you're shown. A round keeps you exploring one continent,
+          then occasionally jumps you somewhere new. It ends when you've placed
+          every country — or after 5 misses, whichever comes first.
         </p>
       </section>
 
       <section class="panel">
         <h2 class="panel-title">Map legend</h2>
         <p class="panel-copy">
-          No two neighboring countries share a color. For gameplay simplicity,
-          the wider Jammu &amp; Kashmir / Ladakh / Aksai Chin / Shaksgam Valley /
-          Pakistan-administered Kashmir region is shown and quizzed as part of
-          India — a gameplay choice for this map, not a statement on any
-          country's territorial claims.
+          <span class="legend-swatch"></span> Disputed regions (e.g. Aksai Chin,
+          Pakistan-administered Kashmir) are shown in grey and aren't part of the
+          quiz — borders here are simplified reference lines, not a political
+          statement.
         </p>
       </section>
     </aside>

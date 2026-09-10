@@ -90,11 +90,6 @@ html, body {
   padding: 11px 22px;
 }
 
-.control-row .btn-primary:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
 .live-stats {
   display: flex;
   gap: 22px;
@@ -189,30 +184,28 @@ html, body {
 .map-canvas:active { cursor: grabbing; }
 .map-canvas svg { display: block; width: 100%; height: 100%; }
 
-/* Countries: thin hairline borders. pointer-events cover fill + stroke
-   directly on the visible path — no separate transparent hit-target
-   layer, since that was intercepting taps before they reached a country. */
+/* Countries: thin hairline borders */
 .country {
   stroke: #FBFAF6;
-  stroke-width: 0.6;
+  stroke-width: 0.25;
   vector-effect: non-scaling-stroke;
-  pointer-events: all;
-  cursor: pointer;
   transition: filter 0.12s ease;
 }
 .country:hover { filter: brightness(1.08); }
 
 .country.correct-flash { fill: var(--good) !important; }
 .country.wrong-flash { fill: var(--bad) !important; }
+.country.answer-flash { stroke: var(--ink); stroke-width: 1.1; }
 
-/* Shown after a miss or skip to pan/zoom to, and point at, the right answer */
-@keyframes revealPulse {
-  0%, 100% { stroke: var(--terracotta-dark); stroke-width: 1; fill-opacity: 1; }
-  50% { stroke: var(--terracotta-dark); stroke-width: 3.2; fill-opacity: 0.82; }
-}
-.country.reveal-pulse {
-  animation: revealPulse 0.55s ease-in-out 3;
+/* Disputed regions: grey, non-interactive overlay */
+.disputed-region {
+  fill: var(--disputed);
+  fill-opacity: 0.92;
+  stroke: #FBFAF6;
+  stroke-width: 0.25;
+  stroke-dasharray: 1.2 1;
   vector-effect: non-scaling-stroke;
+  pointer-events: none;
 }
 
 .prompt-card {
@@ -223,40 +216,39 @@ html, body {
   z-index: 20;
   background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
-  padding: 8px 16px;
+  padding: 12px 22px;
   text-align: center;
-  max-width: min(80%, 320px);
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  max-width: min(92%, 480px);
 }
 
 .prompt-label {
-  display: none;
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+  margin-bottom: 2px;
 }
 
 .prompt-country {
   display: block;
   font-family: 'Fraunces', serif;
-  font-size: 1.05rem;
+  font-size: 1.5rem;
   font-weight: 600;
   color: var(--terracotta-dark);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .skip-chip {
   display: inline-block;
-  flex-shrink: 0;
+  margin-top: 10px;
   border: none;
   background: var(--cream);
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 5px 11px;
-  font-size: 0.72rem;
+  padding: 6px 14px;
+  font-size: 0.76rem;
   font-weight: 600;
   color: var(--ink-soft);
   cursor: pointer;
@@ -266,7 +258,7 @@ html, body {
 
 .feedback-toast {
   position: absolute;
-  top: 76px;
+  top: 108px;
   left: 50%;
   transform: translateX(-50%) translateY(-8px);
   z-index: 21;
@@ -366,6 +358,16 @@ html, body {
   margin: 0;
 }
 
+.legend-swatch {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  background: var(--disputed);
+  vertical-align: middle;
+  margin-right: 2px;
+}
+
 .high-score {
   display: flex;
   align-items: baseline;
@@ -462,7 +464,7 @@ html, body {
   .control-row { gap: 12px; padding: 12px 16px; }
   .live-stats { gap: 14px; }
   .history-strip { padding: 8px 16px; }
-  .prompt-country { font-size: 0.95rem; }
+  .prompt-country { font-size: 1.25rem; }
 }
 
 @media (max-width: 480px) {
