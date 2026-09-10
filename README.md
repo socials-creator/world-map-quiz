@@ -1,106 +1,78 @@
-# 🌐 Where in the World
+# Where in the World 🌐
 
-A fast, mobile-first interactive geography game designed for iPhone and GitHub Pages.
+A modern, pinch-zoomable geography game: you're given a country name and you tap it on the map. Built as static HTML/CSS/JS — no build step, no backend, deploys straight to GitHub Pages.
 
-The goal is simple:
+**V4 changes:**
+- Fixed countries being unselectable — the old invisible "hit-target" overlay layer sat on top of the map and was swallowing taps before they reached a country. Click handling now lives directly on each visible country shape.
+- The Jammu & Kashmir / Ladakh / Aksai Chin / Shaksgam Valley / Pakistan-administered Kashmir region is merged into India: same fill color, quizzed as "India," no separate grey overlay. This is a gameplay simplification, not a statement on any country's territorial claims.
+- The question card is now compact — just the country name and a Skip button, no explanatory text underneath.
+- Exactly **197 quiz countries**: the 193 UN member states plus Palestine, the Holy See (Vatican City), Kosovo, and Taiwan. Overseas territories (Greenland, Puerto Rico, Hong Kong, French Guiana, etc.) are folded into their sovereign country and are never asked as separate answers. Switched to the 10m-resolution `world-atlas` dataset so tiny states like Vatican City, Monaco, and San Marino render as real shapes.
 
-> Find the country shown at the top of the map.
+**V3 changes:** higher max zoom (up to 40×); a missed or skipped country now pans/zooms the map to it and pulses its border instead of just naming it; fixed a continent-classification bug that put some Pacific nations in the wrong region bucket.
 
-Tap the country directly on the map to answer.
-
----
+**V2 changes:** thinner borders, New Game + Last 10 Games moved onto the home screen instead of behind the hamburger, rounds now run until every country is placed or you rack up 5 misses.
 
 ## Features
 
-- 🌎 Interactive world map
-- 📱 Designed for iPhone touch screens
-- 🗺️ Detailed 10m world map geometry
-- 🎯 Direct country selection
-- 🔍 Pinch/drag/zoom-friendly map
-- ➕ Zoom in / zoom out / reset controls
-- ❤️ Up to 5 mistakes per round
-- 📊 Found / Missed / Remaining counters
-- 🕘 Last 10 game results
-- 🏆 Persistent high score
-- 🔄 Play again after each round
-- ☰ Information drawer
-- ⚡ No backend required
-- 💾 Scores stored locally in the browser
+- **New game**, always visible in the control row. A round runs until you've placed **every one of the 197 countries, or reached 5 misses**, whichever comes first. The next country is usually picked from the same continent you're already in, with an occasional jump to a different continent.
+- **Last 10 games**, always visible as a scrollable strip under the control row, and **highest score ever**, in the hamburger drawer — saved locally in your browser (`localStorage`), no account needed.
+- The hamburger (☰) holds secondary, check-occasionally info: highest score, how a round works, and the map legend.
+- Every country is colored so that **no two neighboring countries share a color** — computed automatically at load time from each country's actual border adjacency (graph coloring).
+- Pinch-to-zoom and drag-to-pan on touch devices, plus on-screen zoom buttons for desktop/mouse, zoomable up to 40×.
+- Miss a country or skip it, and the map pans and zooms to the correct one, pulsing its border for a moment, before moving to the next country.
+- Warm, editorial visual style (Fraunces serif display + Inter body) rather than a generic dashboard look.
 
----
+## Files
 
-## Number of countries
+```
+index.html    structure
+style.css     styling
+script.js     map rendering + game logic
+README.md     this file
+```
 
-The game contains **197 quiz countries/entities**.
+Map data loads at runtime from a public CDN (`world-atlas` 10m, derived from Natural Earth), so there's nothing to download or bundle.
 
-The list includes:
+## Run it locally
 
-- 193 United Nations member states
-- Palestine
-- Holy See / Vatican City
-- Kosovo
-- Taiwan
+Any static file server works, e.g.:
 
-This keeps the game close to the commonly used "197 countries" count while still including every UN member state.
+```bash
+cd geo-game
+python3 -m http.server 8000
+```
 
-### Territories are NOT separate quiz questions
+Then open `http://localhost:8000`.
 
-Dependent and overseas territories are not presented as separate countries.
+## Publish on GitHub Pages
 
-Examples include:
+1. Create a new GitHub repository (or use an existing one).
+2. Add these four files to the repo root (or to a `/docs` folder if you prefer).
+3. Commit and push:
+   ```bash
+   git init
+   git add index.html style.css script.js README.md
+   git commit -m "Where in the World v4"
+   git branch -M main
+   git remote add origin https://github.com/<your-username>/<your-repo>.git
+   git push -u origin main
+   ```
+4. In the repo on GitHub: **Settings → Pages**.
+5. Under **Build and deployment → Source**, choose **Deploy from a branch**.
+6. Pick branch `main` and folder `/ (root)` (or `/docs` if that's where you put the files), then **Save**.
+7. GitHub will give you a live URL shortly, typically `https://<your-username>.github.io/<your-repo>/`.
 
-- Greenland → Denmark
-- Faroe Islands → Denmark
-- Puerto Rico → United States
-- Guam → United States
-- Bermuda → United Kingdom
-- Cayman Islands → United Kingdom
-- French Guiana → France
-- French Polynesia → France
-- Réunion → France
-- New Caledonia → France
-- Hong Kong → China
-- Macao → China
-- Christmas Island → Australia
-- Cocos Islands → Australia
-- Tokelau → New Zealand
-- Curaçao → Netherlands
+No further configuration is needed — everything runs client-side.
 
-This prevents the game from treating dependent territories as independent countries.
+## A note on borders
 
----
+The map uses a standard, widely-used open geographic dataset (Natural Earth, via `world-atlas`) rather than any single country's official claimed boundaries. For this game, the wider Jammu & Kashmir / Ladakh / Aksai Chin / Shaksgam Valley / Pakistan-administered Kashmir region is shown and quizzed as part of India — a gameplay choice made at the requester's direction, not a claim about the region's legal or political status. The outline used for that region is a hand-simplified approximation for gameplay, not a precise or legal boundary reference.
 
-## Kashmir gameplay region
+## Customizing
 
-For the purposes of this game, the wider Kashmir gameplay region requested for the game is assigned to **India's colour**.
-
-The gameplay overlay includes:
-
-- Jammu and Kashmir
-- Ladakh
-- Aksai Chin
-- Shaksgam Valley
-- Pakistan-administered Kashmir
-
-The boundaries used by the game are intentionally chosen gameplay boundaries rather than an attempt to represent an international legal position.
-
-The area is clickable as **India**.
-
----
-
-## Country selection
-
-The game uses the visible country shapes themselves as the primary touch targets.
-
-There is intentionally no large transparent hit-target layer covering the map.
-
-This is important for mobile devices because overlapping transparent hit targets can intercept taps and make the visible country underneath impossible to select.
-
-The current version therefore uses:
-
-```text
-Visible country
-      ↓
-Direct tap
-      ↓
-Country selection
+- **Ending conditions**: change `MAX_MISTAKES` in `script.js` (currently 5; a round also always ends once every country has been asked).
+- **How often it jumps continents**: change `SAME_CONTINENT_PROBABILITY` (0–1, higher = stays local more).
+- **Color palette**: edit the `PALETTE` array in `script.js`.
+- **Quiz country list / territory mapping**: edit `QUIZ_COUNTRIES` and `TERRITORY_PARENT` in `script.js`.
+- **Kashmir gameplay region outline**: edit the `KASHMIR_FEATURE` constant in `script.js`.
+- **Fonts / colors**: edit the `:root` variables at the top of `style.css`.
