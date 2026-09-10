@@ -1,78 +1,472 @@
-# Where in the World 🌐
+:root {
+  --cream: #F6F2EA;
+  --paper: #FFFFFF;
+  --ink: #24211C;
+  --ink-soft: #6B6558;
+  --terracotta: #D97757;
+  --terracotta-dark: #B85C3F;
+  --teal: #2E6B63;
+  --line: #E4DDCE;
+  --good: #3F8C5F;
+  --bad: #C24E4E;
+  --disputed: #ADA79B;
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 9px;
+  --shadow: 0 1px 2px rgba(36,33,28,0.06), 0 8px 24px rgba(36,33,28,0.06);
+}
 
-A modern, pinch-zoomable geography game: you're given a country name and you tap it on the map. Built as static HTML/CSS/JS — no build step, no backend, deploys straight to GitHub Pages.
+* { box-sizing: border-box; }
 
-**V4 changes:**
-- Fixed countries being unselectable — the old invisible "hit-target" overlay layer sat on top of the map and was swallowing taps before they reached a country. Click handling now lives directly on each visible country shape.
-- The Jammu & Kashmir / Ladakh / Aksai Chin / Shaksgam Valley / Pakistan-administered Kashmir region is merged into India: same fill color, quizzed as "India," no separate grey overlay. This is a gameplay simplification, not a statement on any country's territorial claims.
-- The question card is now compact — just the country name and a Skip button, no explanatory text underneath.
-- Exactly **197 quiz countries**: the 193 UN member states plus Palestine, the Holy See (Vatican City), Kosovo, and Taiwan. Overseas territories (Greenland, Puerto Rico, Hong Kong, French Guiana, etc.) are folded into their sovereign country and are never asked as separate answers. Switched to the 10m-resolution `world-atlas` dataset so tiny states like Vatican City, Monaco, and San Marino render as real shapes.
+html, body {
+  height: 100%;
+  margin: 0;
+  background: var(--cream);
+  color: var(--ink);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
 
-**V3 changes:** higher max zoom (up to 40×); a missed or skipped country now pans/zooms the map to it and pulses its border instead of just naming it; fixed a continent-classification bug that put some Pacific nations in the wrong region bucket.
+.app {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
 
-**V2 changes:** thinner borders, New Game + Last 10 Games moved onto the home screen instead of behind the hamburger, rounds now run until every country is placed or you rack up 5 misses.
+/* ---------- Topbar (brand + hamburger only) ---------- */
 
-## Features
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 12px 22px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+  z-index: 30;
+}
 
-- **New game**, always visible in the control row. A round runs until you've placed **every one of the 197 countries, or reached 5 misses**, whichever comes first. The next country is usually picked from the same continent you're already in, with an occasional jump to a different continent.
-- **Last 10 games**, always visible as a scrollable strip under the control row, and **highest score ever**, in the hamburger drawer — saved locally in your browser (`localStorage`), no account needed.
-- The hamburger (☰) holds secondary, check-occasionally info: highest score, how a round works, and the map legend.
-- Every country is colored so that **no two neighboring countries share a color** — computed automatically at load time from each country's actual border adjacency (graph coloring).
-- Pinch-to-zoom and drag-to-pan on touch devices, plus on-screen zoom buttons for desktop/mouse, zoomable up to 40×.
-- Miss a country or skip it, and the map pans and zooms to the correct one, pulsing its border for a moment, before moving to the next country.
-- Warm, editorial visual style (Fraunces serif display + Inter body) rather than a generic dashboard look.
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 1.2rem;
+  letter-spacing: -0.01em;
+}
 
-## Files
+.brand-mark { font-size: 1.35rem; }
 
-```
-index.html    structure
-style.css     styling
-script.js     map rendering + game logic
-README.md     this file
-```
+.btn-icon {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  width: 38px; height: 38px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: var(--ink);
+  flex-shrink: 0;
+}
 
-Map data loads at runtime from a public CDN (`world-atlas` 10m, derived from Natural Earth), so there's nothing to download or bundle.
+/* ---------- Control row: New Game + live stats, always visible ---------- */
 
-## Run it locally
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 22px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
 
-Any static file server works, e.g.:
+.control-row .btn-primary {
+  width: auto;
+  padding: 11px 22px;
+}
 
-```bash
-cd geo-game
-python3 -m http.server 8000
-```
+.control-row .btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 
-Then open `http://localhost:8000`.
+.live-stats {
+  display: flex;
+  gap: 22px;
+  margin-left: auto;
+}
 
-## Publish on GitHub Pages
+.stat { display: flex; flex-direction: column; line-height: 1.2; }
+.stat-label { font-size: 0.66rem; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.06em; }
+.stat-value { font-family: 'Fraunces', serif; font-size: 1.1rem; font-weight: 600; }
 
-1. Create a new GitHub repository (or use an existing one).
-2. Add these four files to the repo root (or to a `/docs` folder if you prefer).
-3. Commit and push:
-   ```bash
-   git init
-   git add index.html style.css script.js README.md
-   git commit -m "Where in the World v4"
-   git branch -M main
-   git remote add origin https://github.com/<your-username>/<your-repo>.git
-   git push -u origin main
-   ```
-4. In the repo on GitHub: **Settings → Pages**.
-5. Under **Build and deployment → Source**, choose **Deploy from a branch**.
-6. Pick branch `main` and folder `/ (root)` (or `/docs` if that's where you put the files), then **Save**.
-7. GitHub will give you a live URL shortly, typically `https://<your-username>.github.io/<your-repo>/`.
+/* ---------- History strip: last 10 games, always visible ---------- */
 
-No further configuration is needed — everything runs client-side.
+.history-strip {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 22px;
+  background: var(--cream);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+  overflow: hidden;
+}
 
-## A note on borders
+.history-strip-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  flex-shrink: 0;
+}
 
-The map uses a standard, widely-used open geographic dataset (Natural Earth, via `world-atlas`) rather than any single country's official claimed boundaries. For this game, the wider Jammu & Kashmir / Ladakh / Aksai Chin / Shaksgam Valley / Pakistan-administered Kashmir region is shown and quizzed as part of India — a gameplay choice made at the requester's direction, not a claim about the region's legal or political status. The outline used for that region is a hand-simplified approximation for gameplay, not a precise or legal boundary reference.
+.history-scroller {
+  list-style: none;
+  margin: 0;
+  padding: 2px;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  flex: 1;
+  scrollbar-width: thin;
+}
 
-## Customizing
+.history-scroller li {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
 
-- **Ending conditions**: change `MAX_MISTAKES` in `script.js` (currently 5; a round also always ends once every country has been asked).
-- **How often it jumps continents**: change `SAME_CONTINENT_PROBABILITY` (0–1, higher = stays local more).
-- **Color palette**: edit the `PALETTE` array in `script.js`.
-- **Quiz country list / territory mapping**: edit `QUIZ_COUNTRIES` and `TERRITORY_PARENT` in `script.js`.
-- **Kashmir gameplay region outline**: edit the `KASHMIR_FEATURE` constant in `script.js`.
-- **Fonts / colors**: edit the `:root` variables at the top of `style.css`.
+.history-scroller li.completed { border-color: var(--good); }
+
+.history-score { font-weight: 700; font-family: 'Fraunces', serif; }
+.history-date { color: var(--ink-soft); font-size: 0.74rem; }
+
+.history-empty {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  background: none !important;
+  border: none !important;
+  padding: 4px 2px !important;
+}
+
+/* ---------- Layout: map + drawer ---------- */
+
+.layout {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  position: relative;
+}
+
+.map-stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  background: linear-gradient(180deg, #EAF2F1 0%, #E7EEE8 100%);
+}
+
+.map-canvas {
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+.map-canvas:active { cursor: grabbing; }
+.map-canvas svg { display: block; width: 100%; height: 100%; }
+
+/* Countries: thin hairline borders. pointer-events cover fill + stroke
+   directly on the visible path — no separate transparent hit-target
+   layer, since that was intercepting taps before they reached a country. */
+.country {
+  stroke: #FBFAF6;
+  stroke-width: 0.6;
+  vector-effect: non-scaling-stroke;
+  pointer-events: all;
+  cursor: pointer;
+  transition: filter 0.12s ease;
+}
+.country:hover { filter: brightness(1.08); }
+
+.country.correct-flash { fill: var(--good) !important; }
+.country.wrong-flash { fill: var(--bad) !important; }
+
+/* Shown after a miss or skip to pan/zoom to, and point at, the right answer */
+@keyframes revealPulse {
+  0%, 100% { stroke: var(--terracotta-dark); stroke-width: 1; fill-opacity: 1; }
+  50% { stroke: var(--terracotta-dark); stroke-width: 3.2; fill-opacity: 0.82; }
+}
+.country.reveal-pulse {
+  animation: revealPulse 0.55s ease-in-out 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.prompt-card {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  padding: 8px 16px;
+  text-align: center;
+  max-width: min(80%, 320px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.prompt-label {
+  display: none;
+}
+
+.prompt-country {
+  display: block;
+  font-family: 'Fraunces', serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--terracotta-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.skip-chip {
+  display: inline-block;
+  flex-shrink: 0;
+  border: none;
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.skip-chip:disabled { opacity: 0.4; cursor: not-allowed; }
+.skip-chip:not(:disabled):hover { background: var(--line); color: var(--ink); }
+
+.feedback-toast {
+  position: absolute;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  z-index: 21;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.86rem;
+  color: #fff;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  max-width: min(85%, 420px);
+  text-align: center;
+}
+.feedback-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.feedback-toast.good { background: var(--good); }
+.feedback-toast.bad { background: var(--bad); }
+
+.zoom-controls {
+  position: absolute;
+  bottom: 22px;
+  right: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 20;
+}
+.zoom-controls button {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  font-size: 1.1rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+.zoom-controls button:active { transform: scale(0.95); }
+
+/* ---------- Secondary drawer: High score + About, one tap away ---------- */
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(340px, 88%);
+  background: var(--paper);
+  border-left: 1px solid var(--line);
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transform: translateX(100%);
+  transition: transform 0.22s ease;
+  z-index: 60;
+  box-shadow: var(--shadow);
+}
+.drawer.open { transform: translateX(0); }
+
+.drawer-close {
+  align-self: flex-end;
+  margin-bottom: -4px;
+}
+
+.drawer-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(36,33,28,0.35);
+  z-index: 50;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.drawer-scrim.show { opacity: 1; pointer-events: auto; }
+
+.panel {
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+}
+
+.panel-title {
+  font-family: 'Fraunces', serif;
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.panel-copy {
+  font-size: 0.86rem;
+  color: var(--ink-soft);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.high-score {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.high-score-number {
+  font-family: 'Fraunces', serif;
+  font-size: 2.6rem;
+  font-weight: 700;
+  color: var(--terracotta-dark);
+  line-height: 1;
+}
+.high-score-out-of {
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+
+/* ---------- Buttons ---------- */
+
+.btn-primary {
+  padding: 12px 16px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--terracotta);
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.btn-primary:hover { background: var(--terracotta-dark); }
+.btn-primary:active { transform: scale(0.98); }
+
+.btn-ghost {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink);
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.btn-ghost:hover { background: var(--line); }
+
+/* ---------- Result overlay ---------- */
+
+.result-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(36,33,28,0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+}
+.result-overlay.show { display: flex; }
+
+.result-card {
+  background: var(--paper);
+  border-radius: var(--radius-lg);
+  padding: 32px 28px;
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.result-card h2 {
+  font-family: 'Fraunces', serif;
+  margin: 0 0 6px;
+  font-size: 1.4rem;
+}
+.result-score {
+  font-family: 'Fraunces', serif;
+  font-size: 2.8rem;
+  font-weight: 700;
+  color: var(--terracotta-dark);
+  margin: 6px 0;
+}
+.result-copy {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  margin: 0 0 20px;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 820px) {
+  .control-row { gap: 12px; padding: 12px 16px; }
+  .live-stats { gap: 14px; }
+  .history-strip { padding: 8px 16px; }
+  .prompt-country { font-size: 0.95rem; }
+}
+
+@media (max-width: 480px) {
+  .brand-name { display: none; }
+  .stat-label { font-size: 0.6rem; }
+  .stat-value { font-size: 0.98rem; }
+}
