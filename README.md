@@ -2,6 +2,8 @@
 
 A modern, pinch-zoomable geography game: you're given a country name and you tap it on the map. Built as static HTML/CSS/JS — no build step, no backend, deploys straight to GitHub Pages.
 
+**V3 changes:** much higher max zoom (up to 40×) plus an invisible wider tap-margin around every country, so small shapes like Portugal are far easier to hit; switched to the 50m-resolution map data for far better coverage of Caribbean and Pacific island nations; a missed or skipped country now pans/zooms the map to it and pulses its border instead of just naming it; fixed a continent-classification bug that put some Pacific nations (e.g. Samoa, Tonga) in the wrong region bucket.
+
 **V2 changes:** thinner borders, disputed regions (Aksai Chin, Pakistan-administered Kashmir) shown as a neutral grey overlay outside the quiz, New Game + Last 10 Games moved onto the home screen instead of behind the hamburger, and rounds now run until every country is placed or you rack up 5 misses.
 
 ## Features
@@ -11,8 +13,13 @@ A modern, pinch-zoomable geography game: you're given a country name and you tap
 - The hamburger (☰) now only holds secondary, check-occasionally info: highest score, how a round works, and the map legend — not anything needed to start or track a game.
 - Every country is colored so that **no two neighboring countries share a color** — computed automatically at load time from each country's actual border adjacency (graph coloring).
 - Disputed regions (Aksai Chin, Pakistan-administered Kashmir) are drawn as a neutral grey overlay, excluded from the quiz — see "A note on borders" below.
-- Pinch-to-zoom and drag-to-pan on touch devices, plus on-screen zoom buttons for desktop/mouse. Country borders are thin hairlines that stay thin at any zoom level (non-scaling stroke).
+- Pinch-to-zoom and drag-to-pan on touch devices, plus on-screen zoom buttons for desktop/mouse, zoomable up to 40×. Country borders are thin hairlines that stay thin at any zoom level (non-scaling stroke), and every country has an invisible slightly-wider tap margin so thin or small shapes (Portugal, small islands) are easier to hit precisely.
+- Miss a country or skip it, and the map pans and zooms in on the correct one, pulsing its border for a moment, before moving on.
 - Warm, editorial visual style (Fraunces serif display + Inter body) rather than a generic dashboard look.
+
+## Known data limits
+
+Even at 50m resolution, Natural Earth's dataset omits a handful of the very smallest sovereign states (e.g. Vatican City, Monaco) — those only exist as separate shapes in Natural Earth's 10m layer, which is much larger and would slow down the initial map load. If you want full microstate coverage, you can point `WORLD_URL` in `script.js` at a 10m TopoJSON/GeoJSON source instead; expect a bigger download.
 
 ## Files
 
