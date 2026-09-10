@@ -43,12 +43,6 @@
   <div class="layout">
 
     <main class="map-stage">
-      <!-- Only visible on short-landscape touch screens (e.g. iPhone rotated
-           sideways) via CSS — see .menu-toggle-floating in style.css. The
-           topbar (and its hamburger) is hidden there, so this floating
-           button takes over opening the drawer. -->
-      <button class="btn-icon menu-toggle-floating" id="menu-toggle-floating" aria-label="Open menu">☰</button>
-
       <div class="prompt-card" id="prompt-card">
         <span class="prompt-country" id="prompt-country">🌍</span>
         <button class="skip-chip" id="skip-btn" disabled>Skip →</button>
@@ -68,20 +62,6 @@
     <!-- ===== Secondary drawer: High score + About/legend — one tap away, not core loop ===== -->
     <aside class="drawer" id="sidebar">
       <button class="btn-icon drawer-close" id="drawer-close" aria-label="Close">✕</button>
-
-      <!-- Only shown on short-landscape touch screens (see .panel-game in
-           style.css) — holds the New Game button and live stats that the
-           hidden control row would normally show, so nothing is lost when
-           the header collapses into this drawer. -->
-      <section class="panel panel-game" id="drawer-game-panel">
-        <h2 class="panel-title">Game</h2>
-        <button class="btn-primary" id="new-game-btn-drawer">New game</button>
-        <div class="live-stats">
-          <div class="stat"><span class="stat-label">Found</span><span class="stat-value" id="live-score-drawer">0</span></div>
-          <div class="stat"><span class="stat-label">Missed</span><span class="stat-value" id="live-mistakes-drawer">0 / 5</span></div>
-          <div class="stat"><span class="stat-label">Remaining</span><span class="stat-value" id="live-remaining-drawer">—</span></div>
-        </div>
-      </section>
 
       <section class="panel">
         <h2 class="panel-title">Highest score ever</h2>

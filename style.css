@@ -479,34 +479,6 @@ html, body {
   margin: 0 0 20px;
 }
 
-/* ---------- Floating hamburger (short-landscape phones only, see media query below) ---------- */
-
-.menu-toggle-floating {
-  display: none; /* switched on only inside the landscape media query below */
-  position: fixed;
-  top: calc(10px + env(safe-area-inset-top, 0px));
-  right: calc(12px + env(safe-area-inset-right, 0px));
-  z-index: 40;
-  align-items: center;
-  justify-content: center;
-  background: var(--paper);
-  box-shadow: var(--shadow);
-}
-
-/* ---------- Drawer "Game" panel (short-landscape phones only) ---------- */
-
-.panel-game {
-  display: none; /* switched on only inside the landscape media query below */
-}
-.panel-game .btn-primary {
-  width: 100%;
-  margin-bottom: 14px;
-}
-.panel-game .live-stats {
-  margin-left: 0;
-  justify-content: space-between;
-}
-
 /* ---------- Responsive ---------- */
 
 @media (max-width: 820px) {
@@ -519,33 +491,4 @@ html, body {
   .brand-name { display: none; }
   .stat-label { font-size: 0.6rem; }
   .stat-value { font-size: 0.98rem; }
-}
-
-/* ---------- iPhone (and other short-screen touch devices) in landscape:
-   collapse the topbar, control row, and history strip so the map fills
-   the screen. Their contents move into the drawer (opened via the
-   floating hamburger above) instead of disappearing. Scoped with
-   hover:none + pointer:coarse + max-height so desktop/tablet browsers —
-   including desktop windows resized to a landscape shape — are never
-   affected. ---------- */
-
-@media (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
-  .topbar,
-  .control-row,
-  .history-strip {
-    display: none;
-  }
-
-  .menu-toggle-floating {
-    display: flex;
-  }
-
-  .panel-game {
-    display: block;
-  }
-
-  .zoom-controls {
-    right: calc(14px + env(safe-area-inset-right, 0px));
-    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-  }
 }
