@@ -205,6 +205,7 @@ html, body {
   vector-effect: non-scaling-stroke;
   pointer-events: all;
   cursor: pointer;
+  touch-action: none;
 }
 
 /* Shown after a miss or skip to pan/zoom to, and point at, the right answer */

@@ -1,5 +1,5 @@
 /* ============================================================
-   Where in the World — geography pointing game (V2)
+   Where in the World — geography pointing game (V8)
    Data: Natural Earth via world-atlas (CDN), TopoJSON
    ============================================================ */
 
@@ -15,6 +15,12 @@ const MAX_MISTAKES = 5;
 const SAME_CONTINENT_PROBABILITY = 0.72; // chance the next country stays in-region
 const REVEAL_ZOOM_MS = 650;    // pan/zoom duration when pointing to a missed country
 const REVEAL_HOLD_MS = 1700;   // how long we linger before the next question
+
+// Tap-detection tuning (V8): replaces relying on the browser's synthetic
+// "click" event, which d3-zoom's preventDefault() on touchstart can
+// suppress on touch devices — see the V8 changelog note in README.
+const TAP_MAX_MOVE_PX = 10;
+const TAP_MAX_DURATION_MS = 600;
 
 const STORAGE_HISTORY_KEY = "geoGame.history.v6";
 const STORAGE_HIGH_KEY = "geoGame.highScore.v6";
@@ -233,7 +239,8 @@ const PALETTE = [
 ];
 
 function colorForIndex(i) {
-  if (i < PALETTE.length) return PALETTE[i];
+  if (i >= 0 && i < PALETTE.length) return PALETTE[i];
+  if (i < 0) return PALETTE[0]; // defensive: never index with -1 (e.g. India not found)
   const hue = (i * 47) % 360;
   return `hsl(${hue} 55% 55%)`;
 }
@@ -278,11 +285,13 @@ function resolveSovereignIndex(i) {
 /* ---------- Load data ---------- */
 
 d3.json(WORLD_URL).then((world) => {
+  // --- Step 1: parse the fetched TopoJSON into usable game data. Errors
+  // here mean we genuinely have no map to show, so they fall through to
+  // the outer .catch() below, which is the correct "reload the page" case.
   const objectKey = Object.keys(world.objects)[0];
   const collection = topojson.feature(world, world.objects[objectKey]);
   const rawNeighbors = topojson.neighbors(world.objects[objectKey].geometries);
 
-  // Filter out entries with no renderable geometry / Antarctica for playability
   const keepIndex = [];
   collection.features.forEach((f, i) => {
     if (f.geometry && f.properties.name !== "Antarctica") keepIndex.push(i);
@@ -304,12 +313,28 @@ d3.json(WORLD_URL).then((world) => {
   });
   sovereignIndices = features.map((_, i) => i).filter(i => !EXCLUDE_FROM_QUIZ.has(nameOf[i]));
 
+  if (!features.length) {
+    throw new Error("Parsed world data but found zero renderable country features.");
+  }
+
   assignColors();
   drawMap();
-  loadHighScore();
-  renderHistory();
+
+  // --- Step 2: everything below is "nice to have" (persisted history /
+  // high score). V6/V7 let a failure here (e.g. localStorage blocked by
+  // browser privacy settings) bubble up to the same .catch() as a real
+  // network failure, which wrongly told players to check their connection
+  // even though the map had already drawn correctly. V8 isolates this so
+  // a storage problem can never masquerade as a map-load failure, and the
+  // game stays fully playable (just without persistence) if it happens.
+  try {
+    loadHighScore();
+    renderHistory();
+  } catch (err) {
+    console.warn("Non-fatal: history/high-score init failed, continuing without it.", err);
+  }
 }).catch((err) => {
-  console.error("Failed to load map data:", err);
+  console.error("Failed to load or parse map data:", err);
   els.promptCountry.textContent = "⚠️";
   showToast("Map data failed to load — check your connection and reload the page", "bad");
 });
@@ -352,16 +377,18 @@ function assignColors() {
 
 /* ---------- Draw ---------- */
 
+// V8: the hit-layer (which carries the tap/click handlers) is now drawn
+// immediately after the visible countries, and BEFORE the disputed-region
+// overlay. Previously the disputed-region draw happened first; if anything
+// in that step ever threw, the function returned early and the hit-layer
+// (and therefore every click handler) never got attached at all — the map
+// would still look correct, because the countries had already been painted,
+// but nothing would be clickable. Tapping now works even if the disputed
+// overlay has a problem.
 function drawMap() {
   projection.fitSize([width, height], { type: "Sphere" });
 
-  // Find India's color index for disputed regions
-  const indiaIndex = features.findIndex(f => f.properties.name === "India");
-  indiaColorIndex = indiaIndex >= 0 ? features[indiaIndex].__colorIndex : 0;
-
-  // Visual layer only — click handling lives on the invisible hit-layer
-  // drawn on top of this (see below), which gives small countries a wider
-  // effective tap target without changing how thin the visible border is.
+  // Visual layer — the countries themselves.
   countryLayer.selectAll("path.country")
     .data(features)
     .join("path")
@@ -370,25 +397,67 @@ function drawMap() {
     .attr("fill", d => colorForIndex(d.__colorIndex))
     .attr("data-index", (d, i) => i);
 
-  // Disputed regions: drawn with India's color, clear borders, visual grouping.
-  // Not part of the quiz (excluded from questions and not clickable).
-  disputedLayer.selectAll("path.disputed-region")
-    .data(disputedFeatureCollection.features)
-    .join("path")
-    .attr("class", "disputed-region")
-    .attr("d", path)
-    .attr("fill", colorForIndex(indiaColorIndex));
-
   // Invisible hit layer on top of everything: a few extra screen-pixels of
   // tappable margin around each country's true border, so thin or tiny
   // shapes (Portugal, small islands) are easier to hit precisely.
+  //
+  // V8: uses pointerdown/pointerup tap-detection instead of the "click"
+  // event. On touch devices, d3-zoom calls preventDefault() on touchstart
+  // (to stop the page from scrolling while panning the map), and that also
+  // suppresses the synthetic "click" event browsers normally fire after a
+  // tap — so a plain .on("click", ...) handler here silently never fires
+  // on phones/tablets, even though it works fine with a mouse. Listening
+  // for the raw pointer events instead sidesteps that entirely.
+  let pointerDownInfo = null;
+
   hitLayer.selectAll("path.hit-target")
     .data(features)
     .join("path")
     .attr("class", "hit-target")
     .attr("d", path)
     .attr("data-index", (d, i) => i)
-    .on("click", (event, d) => handleCountryClick(features.indexOf(d)));
+    .on("pointerdown", (event, d) => {
+      pointerDownInfo = {
+        x: event.clientX,
+        y: event.clientY,
+        time: Date.now(),
+        index: features.indexOf(d),
+      };
+    })
+    .on("pointerup", (event, d) => {
+      if (!pointerDownInfo) return;
+      const dx = event.clientX - pointerDownInfo.x;
+      const dy = event.clientY - pointerDownInfo.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const dt = Date.now() - pointerDownInfo.time;
+      const idx = pointerDownInfo.index;
+      pointerDownInfo = null;
+      // Only counts as a tap/click if the pointer didn't move far and
+      // wasn't held down for a drag/long-press — otherwise it was panning.
+      if (dist <= TAP_MAX_MOVE_PX && dt <= TAP_MAX_DURATION_MS) {
+        handleCountryClick(idx);
+      }
+    })
+    .on("pointercancel", () => { pointerDownInfo = null; });
+
+  // Disputed regions: drawn with India's color, clear borders, visual grouping.
+  // Not part of the quiz (excluded from questions and not clickable).
+  // Wrapped in try/catch: this is a cosmetic overlay, so if it ever fails
+  // (e.g. an unexpected India lookup miss) it shouldn't take the rest of
+  // the map — which is already drawn and clickable above — down with it.
+  try {
+    const indiaIndex = features.findIndex(f => f.properties.name === "India");
+    indiaColorIndex = indiaIndex >= 0 ? features[indiaIndex].__colorIndex : 0;
+
+    disputedLayer.selectAll("path.disputed-region")
+      .data(disputedFeatureCollection.features)
+      .join("path")
+      .attr("class", "disputed-region")
+      .attr("d", path)
+      .attr("fill", colorForIndex(indiaColorIndex));
+  } catch (err) {
+    console.warn("Non-fatal: disputed-region overlay failed to draw.", err);
+  }
 }
 
 /* ---------- Game flow ---------- */
@@ -444,6 +513,7 @@ function pickNext() {
 
 function handleCountryClick(clickedIndex) {
   if (!game.active) return;
+  if (clickedIndex === null || clickedIndex === undefined || clickedIndex < 0) return;
 
   const target = game.targetIndex;
   const resolved = resolveSovereignIndex(clickedIndex); // a territory click counts as its parent country
@@ -549,26 +619,89 @@ function closeResult() { els.resultOverlay.classList.remove("show"); }
 
 /* ---------- Persistence ---------- */
 
-function saveResult(score, mistakes, total, completed) {
-  const history = JSON.parse(localStorage.getItem(STORAGE_HISTORY_KEY) || "[]");
-  history.unshift({ score, mistakes, total, completed, date: new Date().toISOString() });
-  localStorage.setItem(STORAGE_HISTORY_KEY, JSON.stringify(history.slice(0, 10)));
+// V8: localStorage can throw (private browsing, strict cookie/privacy
+// settings, some embedded/in-app browsers) instead of just being empty.
+// V6/V7 called it directly, so that exception could escape all the way up
+// to the map-load .catch() and show a false "map failed to load" message
+// even though the map was fine. Now every localStorage touch goes through
+// these helpers, which fall back to an in-memory copy for the current
+// session (history/high score just won't persist across reloads) instead
+// of throwing.
+let storageAvailable = true;
+let memoryHistory = [];
+let memoryHighScore = 0;
 
-  const high = Number(localStorage.getItem(STORAGE_HIGH_KEY) || 0);
-  if (score > high) localStorage.setItem(STORAGE_HIGH_KEY, String(score));
+(function checkStorage() {
+  try {
+    const testKey = "__geoGame_storage_test__";
+    localStorage.setItem(testKey, "1");
+    localStorage.removeItem(testKey);
+  } catch (err) {
+    storageAvailable = false;
+    console.warn("localStorage is unavailable — history and high score will not persist across reloads this session.", err);
+  }
+})();
+
+function readHistory() {
+  if (!storageAvailable) return memoryHistory;
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_HISTORY_KEY) || "[]");
+  } catch (err) {
+    console.warn("Non-fatal: could not read saved history.", err);
+    return memoryHistory;
+  }
+}
+
+function writeHistory(history) {
+  memoryHistory = history;
+  if (!storageAvailable) return;
+  try {
+    localStorage.setItem(STORAGE_HISTORY_KEY, JSON.stringify(history));
+  } catch (err) {
+    console.warn("Non-fatal: could not save history.", err);
+  }
+}
+
+function readHighScore() {
+  if (!storageAvailable) return memoryHighScore;
+  try {
+    return Number(localStorage.getItem(STORAGE_HIGH_KEY) || 0);
+  } catch (err) {
+    console.warn("Non-fatal: could not read saved high score.", err);
+    return memoryHighScore;
+  }
+}
+
+function writeHighScore(value) {
+  memoryHighScore = value;
+  if (!storageAvailable) return;
+  try {
+    localStorage.setItem(STORAGE_HIGH_KEY, String(value));
+  } catch (err) {
+    console.warn("Non-fatal: could not save high score.", err);
+  }
+}
+
+function saveResult(score, mistakes, total, completed) {
+  const history = readHistory();
+  history.unshift({ score, mistakes, total, completed, date: new Date().toISOString() });
+  writeHistory(history.slice(0, 10));
+
+  const high = readHighScore();
+  if (score > high) writeHighScore(score);
 
   renderHistory();
   loadHighScore();
 }
 
 function loadHighScore() {
-  const high = Number(localStorage.getItem(STORAGE_HIGH_KEY) || 0);
+  const high = readHighScore();
   els.highScoreNumber.textContent = high;
   els.highScoreOutof.textContent = `of ${sovereignIndices.length || "—"} countries`;
 }
 
 function renderHistory() {
-  const history = JSON.parse(localStorage.getItem(STORAGE_HISTORY_KEY) || "[]");
+  const history = readHistory();
   if (!history.length) {
     els.historyList.innerHTML = `<li class="history-empty">No games yet — play one to see it here.</li>`;
     return;
