@@ -1,78 +1,297 @@
-# Where in the World 🌐
+#WhereintheWorld🌐
 
-A modern, pinch-zoomable geography game: you're given a country name and you tap it on the map. Built as static HTML/CSS/JS — no build step, no backend, deploys straight to GitHub Pages.
+Amodern,pinch-zoomablegeographypointinggame.
 
-**V3 changes:** much higher max zoom (up to 40×) plus an invisible wider tap-margin around every country, so small shapes like Portugal are far easier to hit; switched to the 50m-resolution map data for far better coverage of Caribbean and Pacific island nations; a missed or skipped country now pans/zooms the map to it and pulses its border instead of just naming it; fixed a continent-classification bug that put some Pacific nations (e.g. Samoa, Tonga) in the wrong region bucket.
+Youaregivenacountrynameandmusttapthatcountryontheworldmap.
 
-**V2 changes:** thinner borders, disputed regions (Aksai Chin, Pakistan-administered Kashmir) shown as a neutral grey overlay outside the quiz, New Game + Last 10 Games moved onto the home screen instead of behind the hamburger, and rounds now run until every country is placed or you rack up 5 misses.
+Thegameiscompletelyclient-sideandcanbepublisheddirectlythroughGitHubPages.
 
-## Features
+⸻
 
-- **New game**, always visible in the control row — no menu digging. A round runs until you've placed **every country on the map, or you reach 5 misses**, whichever comes first. The next country is usually picked from the same continent you're already in, with an occasional (~28% of the time) jump to a different continent to keep you on your toes.
-- **Last 10 games**, always visible as a scrollable strip under the control row, and **highest score ever**, in the hamburger drawer — saved locally in your browser (`localStorage`), no account needed.
-- The hamburger (☰) now only holds secondary, check-occasionally info: highest score, how a round works, and the map legend — not anything needed to start or track a game.
-- Every country is colored so that **no two neighboring countries share a color** — computed automatically at load time from each country's actual border adjacency (graph coloring).
-- Disputed regions (Aksai Chin, Pakistan-administered Kashmir) are drawn as a neutral grey overlay, excluded from the quiz — see "A note on borders" below.
-- Pinch-to-zoom and drag-to-pan on touch devices, plus on-screen zoom buttons for desktop/mouse, zoomable up to 40×. Country borders are thin hairlines that stay thin at any zoom level (non-scaling stroke), and every country has an invisible slightly-wider tap margin so thin or small shapes (Portugal, small islands) are easier to hit precisely.
-- Miss a country or skip it, and the map pans and zooms in on the correct one, pulsing its border for a moment, before moving on.
-- Warm, editorial visual style (Fraunces serif display + Inter body) rather than a generic dashboard look.
+##V4Changes
 
-## Known data limits
+###1.Fixedcountryselection
 
-Even at 50m resolution, Natural Earth's dataset omits a handful of the very smallest sovereign states (e.g. Vatican City, Monaco) — those only exist as separate shapes in Natural Earth's 10m layer, which is much larger and would slow down the initial map load. If you want full microstate coverage, you can point `WORLD_URL` in `script.js` at a 10m TopoJSON/GeoJSON source instead; expect a bigger download.
+Thegamenowusesadedicatedtransparentinteractionlayerabovethevisualmap.
 
-## Files
+Thisprovides:
 
-```
-index.html    structure
-style.css     styling
-script.js     map rendering + game logic
-README.md     this file
-```
+-ReliabletappingoniPhone
+-Largertaptargetsforsmallcountries
+-Pointer-basedtouchhandling
+-Betterhandlingoftinyislands
+-Separatevisualandinteractivemaplayers
 
-Map data loads at runtime from a public CDN (`world-atlas`, derived from Natural Earth), so there's nothing to download or bundle.
+Thevisiblecountrybordersremainthinwhiletheactualtouchareaislarger.
 
-## Run it locally
+⸻
 
-Any static file server works, e.g.:
+###2.India/Kashmirgameplayregion
 
-```bash
-cd geo-game
-python3 -m http.server 8000
-```
+ThefollowinggameplayregionisdisplayedusingIndia’scolor:
 
-Then open `http://localhost:8000`.
+-JammuandKashmir
+-Ladakh
+-AksaiChin
+-ShaksgamValley
+-Pakistan-administeredKashmir
 
-## Publish on GitHub Pages
+TheareaistreatedaspartofIndiaforthepurposeofthegame.
 
-1. Create a new GitHub repository (or use an existing one).
-2. Add these four files to the repo root (or to a `/docs` folder if you prefer).
-3. Commit and push:
-   ```bash
-   git init
-   git add index.html style.css script.js README.md
-   git commit -m "Add geography pointing game"
-   git branch -M main
-   git remote add origin https://github.com/<your-username>/<your-repo>.git
-   git push -u origin main
-   ```
-4. In the repo on GitHub: **Settings → Pages**.
-5. Under **Build and deployment → Source**, choose **Deploy from a branch**.
-6. Pick branch `main` and folder `/ (root)` (or `/docs` if that's where you put the files), then **Save**.
-7. GitHub will give you a live URL shortly, typically `https://<your-username>.github.io/<your-repo>/`.
+Asubtledashedoutlineisusedwhereappropriateratherthanusingthepreviousgreydisputed-regiontreatment.
 
-No further configuration is needed — everything runs client-side.
+Thisisagameplayvisualizationandisnotintendedtobealegalorpoliticalboundaryreference.
 
-## A note on borders
+⸻
 
-The map uses a standard, widely-used open geographic dataset (Natural Earth, via `world-atlas`) rather than any single country's official claimed boundaries. Several regions in the world have borders that are disputed between countries (for example in South Asia, the Middle East, and elsewhere); this app intentionally uses neutral reference boundaries for gameplay rather than adopting one nation's territorial claims over another's.
+###3.Compactquestionbox
 
-Two specific areas — **Aksai Chin** (administered by China, claimed by India) and **Pakistan-administered Kashmir** (Azad Kashmir and Gilgit-Baltistan, claimed by India) — are drawn as a separate grey "disputed" overlay rather than folded into any one country, since the underlying 110m dataset doesn't ship these as separate shapes. The outlines are hand-simplified approximations for gameplay, not a precise or legal boundary reference, and these regions are excluded from the quiz (you're never asked to find them, and they're not clickable — clicks pass through to whatever's beneath). If you need a more precise disputed-areas source, Natural Earth publishes a dedicated `ne_10m_admin_0_disputed_areas` layer you could load and merge in instead of the hand-drawn polygons in `script.js` (the `DISPUTED_REGIONS` constant).
+Thepreviousquestioncardcontained:
 
-## Customizing
+-Countrynumber
+-Countryname
+-Skipbutton
+-Zoomhint
 
-- **Ending conditions**: change `MAX_MISTAKES` in `script.js` (currently 5; a round also always ends once every country has been asked).
-- **How often it jumps continents**: change `SAME_CONTINENT_PROBABILITY` (0–1, higher = stays local more).
-- **Color palette**: edit the `PALETTE` array in `script.js`.
-- **Disputed region outlines**: edit the `DISPUTED_REGIONS` constant in `script.js`.
-- **Fonts / colors**: edit the `:root` variables at the top of `style.css`.
+Thoseextraelementshavebeenremoved.
+
+Thenewquestioncarddisplaysonlythecountryname.
+
+Thismakesitsubstantiallysmallerandleavesmoreofthemapvisible.
+
+⸻
+
+###4.Countrycount
+
+Thegameusesacanonicallistof:
+
+195countries
+
+Thisconsistsof:
+
+-193UnitedNationsmemberstates
+-Palestine
+-VaticanCity
+
+Territoriesanddependenciesarenotpresentedasindependentquizanswers.
+
+Examplesinclude:
+
+-PuertoRico→UnitedStates
+-Greenland→Denmark
+-Guam→UnitedStates
+-Bermuda→UnitedKingdom
+-HongKong→China
+-Macau→China
+-Frenchoverseasterritories→France
+-Caribbeandependencies→theirsovereignstate
+
+Thegamethereforedoesnotaskterritoriesasthoughtheywereindependentcountries.
+
+⸻
+
+##Mapdata
+
+Thegameuses:
+
+world-atlascountries-10m.json
+
+fromtheworld-atlasproject.
+
+The10mdatasetisusedbecausethehigher-resolutionNaturalEarthdataprovidesbettercoverageofverysmallcountriesandmicrostatessuchasMonaco,SanMarinoandVaticanCity.
+
+NaturalEarthdistinguishesbetweencountrymapunitsandsovereignstates,whichiswhythisapplicationappliesitsowncanonicalcountrylistinsteadofsimplytreatingeverymapfeatureasanindependentquizanswer.
+
+⸻
+
+##Gamerules
+
+Aroundbeginswhentheuserpresses:
+
+Newgame
+
+Thegamecontinuesuntil:
+
+1.All195countrieshavebeensuccessfullyfound
+
+or
+
+2.Theplayerreaches5mistakes.
+
+Acorrectselection:
+
+-Adds1tothescore
+-Flashestheselectedcountrygreen
+-Movestothenextcountry
+
+Anincorrectselection:
+
+-Adds1mistake
+-Flashestheselectedcountryred
+-Zoomstowardthecorrectcountry
+-Pulsesthecorrectcountry
+-Movestothenextquestion
+
+⸻
+
+##Countryorder
+
+Thenextquestionnormallycomesfromthesamebroadgeographicregionasthepreviousquestion.
+
+Approximately72%ofthetimethegameremainsinthesameregion.
+
+Theremainderofthetimeitjumpstoanotherregion.
+
+Thispreventsthegamefrombecomingcompletelypredictable.
+
+⸻
+
+##Zoom
+
+Themapsupports:
+
+-Touchpinch-to-zoom
+-Touchpanning
+-Mousewheel/dragzoom
+-Zoombuttons
+-Resetzoom
+
+Maximumzoom:
+
+40×
+
+Thisisparticularlyusefulfor:
+
+-Monaco
+-VaticanCity
+-SanMarino
+-Singapore
+-Caribbeanislands
+-Pacificislandcountries
+-Portugal
+-smallEuropeancountries
+
+⸻
+
+##Colors
+
+Countriesareautomaticallyassignedcolors.
+
+Thegamekeepscountriesfrombeingvisuallyidenticalwherepossiblewhilemaintainingawarmeditorialvisualstyle.
+
+IndiaandthespecialKashmirgameplayregionintentionallyusethesamecolor.
+
+⸻
+
+##Files
+
+index.html
+style.css
+script.js
+README.md
+
+⸻
+
+##Runlocally
+
+AnystaticHTTPservercanbeused.
+
+Forexample:
+
+cdgeo-game
+python3-mhttp.server8000
+
+Thenopen:
+
+http://localhost:8000
+
+⸻
+
+##PublishonGitHubPages
+
+1.CreateoropenyourGitHubrepository.
+
+2.Replacethesefourfiles:
+
+index.html
+style.css
+script.js
+README.md
+
+3.Committhechanges.
+
+4.Open:
+
+Settings→Pages
+
+5.Under:
+
+Buildanddeployment
+
+choose:
+
+Deployfromabranch
+
+6.Select:
+
+main
+/
+(root)
+
+7.Save.
+
+GitHubPageswillpublishtheapplication.
+
+⸻
+
+##Externallibraries
+
+Theapplicationuses:
+
+-D3.js
+-TopoJSONClient
+-world-atlas
+
+TheyareloadedfrompublicCDNsanddonotrequireabuildsystem.
+
+⸻
+
+##Browserstorage
+
+Thegamestores:
+
+-Last10gameresults
+-Highestscore
+
+usingbrowserlocalStorage.
+
+Noaccountorbackendisrequired.
+
+⸻
+
+##Importantmapnote
+
+TheunderlyingNaturalEarth/world-atlasdatarepresentsgeographicboundariesaccordingtoitsowncartographicconventions.
+
+ThisapplicationintentionallymodifiesthepresentationoftheKashmir/Ladakh/AksaiChin/Shaksgam/Pakistan-administeredKashmirgameplayregionsothatitisdisplayedusingIndia’scolorandtreatedaspartofIndiaforthegame.
+
+Theresultingmapshouldthereforebeconsideredagameplaymap,notanauthoritativepoliticalorlegalboundarymap.
+
+⸻
+
+##Version
+
+V4
+
+MainV4improvements:
+
+-ReliableiPhonetouchselection
+-Largerinvisibletaptargets
+-10mworldmap
+-195-countrycanonicalquiz
+-Territoriesexcludedasseparateanswers
+-India-coloredKashmirgameplayregion
+-Compactquestioncard
+-Improvedsmall-countrysupport
+-Improvedcountry-namenormalization
+-Improvedcountryrevealandzoom
