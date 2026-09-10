@@ -218,11 +218,17 @@ html, body {
   vector-effect: non-scaling-stroke;
 }
 
-/* Disputed regions: colored as India with clear borders, non-interactive */
+/* Disputed regions: colored as India, with a visibly distinct dashed
+   border so the grouping actually reads on the map — previously this used
+   the same off-white hairline as every ordinary country border, so at a
+   glance it was indistinguishable from just being part of India (or
+   invisible against the surrounding country), even though it's filled
+   with India's color. Non-interactive either way. */
 .disputed-region {
   fill-opacity: 0.95;
-  stroke: #FBFAF6;
-  stroke-width: 0.4;
+  stroke: var(--terracotta-dark);
+  stroke-width: 1.3;
+  stroke-dasharray: 2.6 1.6;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
 }

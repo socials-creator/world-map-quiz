@@ -26,8 +26,9 @@ const STORAGE_HISTORY_KEY = "geoGame.history.v6";
 const STORAGE_HIGH_KEY = "geoGame.highScore.v6";
 
 /* ---------- Regions whose sovereignty is contested: Jammu & Kashmir,
-   Ladakh, Aksai Chin, Shaksgam Valley, Pakistan-administered Kashmir.
-   These are drawn with India's color and clear borders. Excluded from quiz. ---------- */
+   Ladakh, Siachen Glacier, Aksai Chin, Shaksgam Valley, Pakistan-administered
+   Kashmir. These are drawn with India's color and a distinct dashed border
+   (see .disputed-region in style.css). Excluded from quiz. ---------- */
 
 const DISPUTED_REGIONS = [
   {
@@ -45,6 +46,16 @@ const DISPUTED_REGIONS = [
       [77.25, 32.80], [78.60, 32.50], [79.20, 33.05], [79.65, 34.00],
       [80.05, 35.20], [79.75, 36.05], [78.85, 35.95], [77.95, 35.30],
       [77.45, 34.50], [77.25, 32.80]
+    ]]]
+  },
+  {
+    // The glacier sits in the gap northwest of the Ladakh shape above and
+    // south of Shaksgam Valley below — previously uncovered by either
+    // polygon, so it fell outside the India-colored area entirely.
+    name: "Siachen Glacier",
+    coordinates: [[[
+      [76.85, 35.25], [77.30, 35.15], [77.55, 35.45], [77.50, 35.75],
+      [77.20, 35.95], [76.85, 35.80], [76.65, 35.50], [76.85, 35.25]
     ]]]
   },
   {
@@ -453,7 +464,15 @@ function drawMap() {
   // (e.g. an unexpected India lookup miss) it shouldn't take the rest of
   // the map — which is already drawn and clickable above — down with it.
   try {
-    const indiaIndex = features.findIndex(f => f.properties.name === "India");
+    let indiaIndex = features.findIndex(f => f.properties.name === "India");
+    if (indiaIndex < 0) {
+      // Fallback in case this map-data version uses a slightly different
+      // exact string ("Republic of India", different casing, etc).
+      indiaIndex = features.findIndex(f => (f.properties.name || "").toLowerCase().includes("india"));
+    }
+    if (indiaIndex < 0) {
+      console.warn('Disputed-region overlay: could not find a country named "India" in the map data — the overlay will fall back to a generic color instead of matching India exactly.');
+    }
     indiaColorIndex = indiaIndex >= 0 ? features[indiaIndex].__colorIndex : 0;
 
     disputedLayer.selectAll("path.disputed-region")
@@ -488,7 +507,10 @@ function startGame() {
   // rather than only coloring once at initial load.
   assignColors();
   countryLayer.selectAll("path.country").attr("fill", d => colorForIndex(d.__colorIndex));
-  const indiaIdxForRepaint = features.findIndex(f => f.properties.name === "India");
+  let indiaIdxForRepaint = features.findIndex(f => f.properties.name === "India");
+  if (indiaIdxForRepaint < 0) {
+    indiaIdxForRepaint = features.findIndex(f => (f.properties.name || "").toLowerCase().includes("india"));
+  }
   indiaColorIndex = indiaIdxForRepaint >= 0 ? features[indiaIdxForRepaint].__colorIndex : 0;
   disputedLayer.selectAll("path.disputed-region").attr("fill", colorForIndex(indiaColorIndex));
 
