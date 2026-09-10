@@ -146,10 +146,13 @@ window.addEventListener("resize", () => {
 
 /* ---------- Palette for neighbor-safe coloring ---------- */
 
+// Deliberately avoids teal/seafoam tones, which would blend into the ocean
+// background below, and keeps every color reasonably saturated so borders
+// stay legible against both the map's ocean and the cream page background.
 const PALETTE = [
-  "#D97757", "#2E6B63", "#E8B04B", "#7C6FB0",
-  "#5A9BD5", "#C97A9E", "#8AAE5C", "#E0664E",
-  "#4C9A8E", "#D4A24C", "#9B7EDE", "#6FA8DC",
+  "#D97757", "#3D5A80", "#E8B04B", "#7C6FB0",
+  "#4A7FA5", "#C9425A", "#588157", "#E0664E",
+  "#B5651D", "#8E44AD", "#D4A24C", "#2F4858",
 ];
 
 function colorForIndex(i) {
@@ -221,10 +224,23 @@ function assignColors() {
   const order = features.map((_, i) => i)
     .sort((a, b) => neighborsOf[b].length - neighborsOf[a].length);
 
+  let nextExtra = PALETTE.length; // only used if a node's neighbors exhaust the whole palette
+
   order.forEach((i) => {
     const used = new Set(neighborsOf[i].map(n => colorIndexOf[n]).filter(c => c !== -1));
-    let c = 0;
-    while (used.has(c)) c++;
+
+    // Countries with no neighbors (most islands) have nothing constraining
+    // their color, so a fixed starting point would send all of them to the
+    // same color. Rotate the starting point by each country's own index
+    // instead, so islands spread across the whole palette.
+    let c = i % PALETTE.length;
+    let tries = 0;
+    while (used.has(c) && tries < PALETTE.length) {
+      c = (c + 1) % PALETTE.length;
+      tries++;
+    }
+    if (used.has(c)) c = nextExtra++; // rare: more neighbors than palette colors
+
     colorIndexOf[i] = c;
   });
 
