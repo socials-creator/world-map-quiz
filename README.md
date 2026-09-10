@@ -2,6 +2,10 @@
 
 A modern, pinch-zoomable geography game: you're given a country name and you tap it on the map. Built as static HTML/CSS/JS — no build step, no backend, deploys straight to GitHub Pages.
 
+**V9 changes:**
+- **Fixed: long country names got cut off in the question box.** The prompt card had a hard `140px` max-width and a fixed `2.2rem` font size, so longer names (e.g. "Democratic Republic of the Congo") overflowed or were clipped. The card now grows up to ~340px, the name scales down smoothly for longer text (`clamp()`), and wraps onto a second line if needed instead of being cut off.
+- Updated the map legend copy for Jammu & Kashmir / Ladakh.
+
 **V8 changes (bug fixes — countries weren't clickable, and a false "map failed to load" message appeared even though the map rendered fine):**
 - **Fixed: countries not tappable.** The click handler was attached with a plain `"click"` listener. On touch devices, `d3-zoom` calls `preventDefault()` on `touchstart` (to stop the page scrolling while you pan the map), which also suppresses the synthetic `"click"` event browsers normally fire after a tap — so taps silently did nothing, even though the map looked correct and a mouse click worked fine. Replaced it with a `pointerdown`/`pointerup` based tap detector (small movement + short duration = a tap), which isn't affected by that suppression and works the same for mouse and touch.
 - **Fixed: false "Map data failed to load" message.** That message is meant only for a genuine failed/broken fetch of the map data. Previously, code that ran *after* the map had already drawn successfully — saving/loading your local history and high score via `localStorage` — could throw (e.g. private browsing, strict browser privacy settings, some embedded browsers block `localStorage` entirely) and that error was being caught by the same handler as a real network failure, showing a misleading "check your connection" message even though the map was fine. `localStorage` access is now wrapped so a storage failure degrades gracefully (history/high score just won't persist for that session) instead of throwing, and is isolated from the map-load error path entirely.
