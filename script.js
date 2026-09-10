@@ -175,9 +175,14 @@ const els = {
   playAgainBtn: document.getElementById("play-again-btn"),
   closeResultBtn: document.getElementById("close-result-btn"),
   menuToggle: document.getElementById("menu-toggle"),
+  menuToggleFloating: document.getElementById("menu-toggle-floating"),
   drawer: document.getElementById("sidebar"),
   drawerClose: document.getElementById("drawer-close"),
   drawerScrim: document.getElementById("drawer-scrim"),
+  newGameBtnDrawer: document.getElementById("new-game-btn-drawer"),
+  liveScoreDrawer: document.getElementById("live-score-drawer"),
+  liveMistakesDrawer: document.getElementById("live-mistakes-drawer"),
+  liveRemainingDrawer: document.getElementById("live-remaining-drawer"),
   zoomIn: document.getElementById("zoom-in"),
   zoomOut: document.getElementById("zoom-out"),
   zoomReset: document.getElementById("zoom-reset"),
@@ -606,6 +611,13 @@ function updateLiveStats() {
   els.liveScore.textContent = game.score;
   els.liveMistakes.textContent = `${game.mistakes} / ${MAX_MISTAKES}`;
   els.liveRemaining.textContent = game.active ? game.remaining.length : "—";
+
+  // Mirrors the same numbers into the drawer's "Game" panel, which is the
+  // only place these are visible on short-landscape phones (see the
+  // landscape media query in style.css) once the control row is hidden.
+  els.liveScoreDrawer.textContent = game.score;
+  els.liveMistakesDrawer.textContent = `${game.mistakes} / ${MAX_MISTAKES}`;
+  els.liveRemainingDrawer.textContent = game.active ? game.remaining.length : "—";
 }
 
 function showToast(msg, kind) {
@@ -737,6 +749,15 @@ function closeDrawer() {
   els.drawerScrim.classList.remove("show");
 }
 els.menuToggle.addEventListener("click", openDrawer);
+els.menuToggleFloating.addEventListener("click", openDrawer);
 els.drawerClose.addEventListener("click", closeDrawer);
 els.drawerScrim.addEventListener("click", closeDrawer);
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
+
+// Drawer's own New Game button (only reachable on short-landscape phones,
+// where the main control row is hidden) — starts a round the same way the
+// main button does, then closes the drawer so the player sees the map.
+els.newGameBtnDrawer.addEventListener("click", () => {
+  startGame();
+  closeDrawer();
+});
