@@ -1,297 +1,106 @@
-#WhereintheWorld🌐
+# 🌐 Where in the World
 
-Amodern,pinch-zoomablegeographypointinggame.
+A fast, mobile-first interactive geography game designed for iPhone and GitHub Pages.
 
-Youaregivenacountrynameandmusttapthatcountryontheworldmap.
+The goal is simple:
 
-Thegameiscompletelyclient-sideandcanbepublisheddirectlythroughGitHubPages.
+> Find the country shown at the top of the map.
 
-⸻
+Tap the country directly on the map to answer.
 
-##V4Changes
+---
 
-###1.Fixedcountryselection
+## Features
 
-Thegamenowusesadedicatedtransparentinteractionlayerabovethevisualmap.
+- 🌎 Interactive world map
+- 📱 Designed for iPhone touch screens
+- 🗺️ Detailed 10m world map geometry
+- 🎯 Direct country selection
+- 🔍 Pinch/drag/zoom-friendly map
+- ➕ Zoom in / zoom out / reset controls
+- ❤️ Up to 5 mistakes per round
+- 📊 Found / Missed / Remaining counters
+- 🕘 Last 10 game results
+- 🏆 Persistent high score
+- 🔄 Play again after each round
+- ☰ Information drawer
+- ⚡ No backend required
+- 💾 Scores stored locally in the browser
 
-Thisprovides:
+---
 
--ReliabletappingoniPhone
--Largertaptargetsforsmallcountries
--Pointer-basedtouchhandling
--Betterhandlingoftinyislands
--Separatevisualandinteractivemaplayers
+## Number of countries
 
-Thevisiblecountrybordersremainthinwhiletheactualtouchareaislarger.
+The game contains **197 quiz countries/entities**.
 
-⸻
+The list includes:
 
-###2.India/Kashmirgameplayregion
+- 193 United Nations member states
+- Palestine
+- Holy See / Vatican City
+- Kosovo
+- Taiwan
 
-ThefollowinggameplayregionisdisplayedusingIndia’scolor:
+This keeps the game close to the commonly used "197 countries" count while still including every UN member state.
 
--JammuandKashmir
--Ladakh
--AksaiChin
--ShaksgamValley
--Pakistan-administeredKashmir
+### Territories are NOT separate quiz questions
 
-TheareaistreatedaspartofIndiaforthepurposeofthegame.
+Dependent and overseas territories are not presented as separate countries.
 
-Asubtledashedoutlineisusedwhereappropriateratherthanusingthepreviousgreydisputed-regiontreatment.
+Examples include:
 
-Thisisagameplayvisualizationandisnotintendedtobealegalorpoliticalboundaryreference.
+- Greenland → Denmark
+- Faroe Islands → Denmark
+- Puerto Rico → United States
+- Guam → United States
+- Bermuda → United Kingdom
+- Cayman Islands → United Kingdom
+- French Guiana → France
+- French Polynesia → France
+- Réunion → France
+- New Caledonia → France
+- Hong Kong → China
+- Macao → China
+- Christmas Island → Australia
+- Cocos Islands → Australia
+- Tokelau → New Zealand
+- Curaçao → Netherlands
 
-⸻
+This prevents the game from treating dependent territories as independent countries.
 
-###3.Compactquestionbox
+---
 
-Thepreviousquestioncardcontained:
+## Kashmir gameplay region
 
--Countrynumber
--Countryname
--Skipbutton
--Zoomhint
+For the purposes of this game, the wider Kashmir gameplay region requested for the game is assigned to **India's colour**.
 
-Thoseextraelementshavebeenremoved.
+The gameplay overlay includes:
 
-Thenewquestioncarddisplaysonlythecountryname.
+- Jammu and Kashmir
+- Ladakh
+- Aksai Chin
+- Shaksgam Valley
+- Pakistan-administered Kashmir
 
-Thismakesitsubstantiallysmallerandleavesmoreofthemapvisible.
+The boundaries used by the game are intentionally chosen gameplay boundaries rather than an attempt to represent an international legal position.
 
-⸻
+The area is clickable as **India**.
 
-###4.Countrycount
+---
 
-Thegameusesacanonicallistof:
+## Country selection
 
-195countries
+The game uses the visible country shapes themselves as the primary touch targets.
 
-Thisconsistsof:
+There is intentionally no large transparent hit-target layer covering the map.
 
--193UnitedNationsmemberstates
--Palestine
--VaticanCity
+This is important for mobile devices because overlapping transparent hit targets can intercept taps and make the visible country underneath impossible to select.
 
-Territoriesanddependenciesarenotpresentedasindependentquizanswers.
+The current version therefore uses:
 
-Examplesinclude:
-
--PuertoRico→UnitedStates
--Greenland→Denmark
--Guam→UnitedStates
--Bermuda→UnitedKingdom
--HongKong→China
--Macau→China
--Frenchoverseasterritories→France
--Caribbeandependencies→theirsovereignstate
-
-Thegamethereforedoesnotaskterritoriesasthoughtheywereindependentcountries.
-
-⸻
-
-##Mapdata
-
-Thegameuses:
-
-world-atlascountries-10m.json
-
-fromtheworld-atlasproject.
-
-The10mdatasetisusedbecausethehigher-resolutionNaturalEarthdataprovidesbettercoverageofverysmallcountriesandmicrostatessuchasMonaco,SanMarinoandVaticanCity.
-
-NaturalEarthdistinguishesbetweencountrymapunitsandsovereignstates,whichiswhythisapplicationappliesitsowncanonicalcountrylistinsteadofsimplytreatingeverymapfeatureasanindependentquizanswer.
-
-⸻
-
-##Gamerules
-
-Aroundbeginswhentheuserpresses:
-
-Newgame
-
-Thegamecontinuesuntil:
-
-1.All195countrieshavebeensuccessfullyfound
-
-or
-
-2.Theplayerreaches5mistakes.
-
-Acorrectselection:
-
--Adds1tothescore
--Flashestheselectedcountrygreen
--Movestothenextcountry
-
-Anincorrectselection:
-
--Adds1mistake
--Flashestheselectedcountryred
--Zoomstowardthecorrectcountry
--Pulsesthecorrectcountry
--Movestothenextquestion
-
-⸻
-
-##Countryorder
-
-Thenextquestionnormallycomesfromthesamebroadgeographicregionasthepreviousquestion.
-
-Approximately72%ofthetimethegameremainsinthesameregion.
-
-Theremainderofthetimeitjumpstoanotherregion.
-
-Thispreventsthegamefrombecomingcompletelypredictable.
-
-⸻
-
-##Zoom
-
-Themapsupports:
-
--Touchpinch-to-zoom
--Touchpanning
--Mousewheel/dragzoom
--Zoombuttons
--Resetzoom
-
-Maximumzoom:
-
-40×
-
-Thisisparticularlyusefulfor:
-
--Monaco
--VaticanCity
--SanMarino
--Singapore
--Caribbeanislands
--Pacificislandcountries
--Portugal
--smallEuropeancountries
-
-⸻
-
-##Colors
-
-Countriesareautomaticallyassignedcolors.
-
-Thegamekeepscountriesfrombeingvisuallyidenticalwherepossiblewhilemaintainingawarmeditorialvisualstyle.
-
-IndiaandthespecialKashmirgameplayregionintentionallyusethesamecolor.
-
-⸻
-
-##Files
-
-index.html
-style.css
-script.js
-README.md
-
-⸻
-
-##Runlocally
-
-AnystaticHTTPservercanbeused.
-
-Forexample:
-
-cdgeo-game
-python3-mhttp.server8000
-
-Thenopen:
-
-http://localhost:8000
-
-⸻
-
-##PublishonGitHubPages
-
-1.CreateoropenyourGitHubrepository.
-
-2.Replacethesefourfiles:
-
-index.html
-style.css
-script.js
-README.md
-
-3.Committhechanges.
-
-4.Open:
-
-Settings→Pages
-
-5.Under:
-
-Buildanddeployment
-
-choose:
-
-Deployfromabranch
-
-6.Select:
-
-main
-/
-(root)
-
-7.Save.
-
-GitHubPageswillpublishtheapplication.
-
-⸻
-
-##Externallibraries
-
-Theapplicationuses:
-
--D3.js
--TopoJSONClient
--world-atlas
-
-TheyareloadedfrompublicCDNsanddonotrequireabuildsystem.
-
-⸻
-
-##Browserstorage
-
-Thegamestores:
-
--Last10gameresults
--Highestscore
-
-usingbrowserlocalStorage.
-
-Noaccountorbackendisrequired.
-
-⸻
-
-##Importantmapnote
-
-TheunderlyingNaturalEarth/world-atlasdatarepresentsgeographicboundariesaccordingtoitsowncartographicconventions.
-
-ThisapplicationintentionallymodifiesthepresentationoftheKashmir/Ladakh/AksaiChin/Shaksgam/Pakistan-administeredKashmirgameplayregionsothatitisdisplayedusingIndia’scolorandtreatedaspartofIndiaforthegame.
-
-Theresultingmapshouldthereforebeconsideredagameplaymap,notanauthoritativepoliticalorlegalboundarymap.
-
-⸻
-
-##Version
-
-V4
-
-MainV4improvements:
-
--ReliableiPhonetouchselection
--Largerinvisibletaptargets
--10mworldmap
--195-countrycanonicalquiz
--Territoriesexcludedasseparateanswers
--India-coloredKashmirgameplayregion
--Compactquestioncard
--Improvedsmall-countrysupport
--Improvedcountry-namenormalization
--Improvedcountryrevealandzoom
+```text
+Visible country
+      ↓
+Direct tap
+      ↓
+Country selection
