@@ -2,7 +2,11 @@
 
 A modern, pinch-zoomable geography game: you're given a country name and you tap it on the map. Built as static HTML/CSS/JS — no build step, no backend, deploys straight to GitHub Pages.
 
-**V4 changes:** ~197 UN member countries (switched to 10m-resolution data); fixed click detection on touch devices using d3's `clickTolerance`; question card now minimal (just emoji + skip button); Jammu & Kashmir, Ladakh, Aksai Chin, Shaksgam Valley, and Pakistan-administered Kashmir now displayed with India's color to show regional grouping, with clear borders to denote their disputed status.
+**V6 changes:** fixed a critical bug — V5 pointed the map at `countries-10m.json`, which isn't actually published in the `world-atlas` CDN package, so the map silently failed to load (you'd just see the empty ocean background). Reverted to the working 50m dataset and added an error message if map data ever fails to load again. Also implemented the ~197-country target properly: dependencies and overseas territories (Greenland, Puerto Rico, Hong Kong, French Guiana, and ~50 others) are now excluded from the quiz and visually colored the same as their administering country, and clicking one now correctly counts as answering for that country. Kept the coloring-distribution fix from V5 (see below) rather than reverting it — it was correct and validated; the "only green" report was actually this same data-loading bug, not a coloring bug.
+
+**V5 changes:** fixed the coloring algorithm so islands (which have no bordering neighbors to constrain their color) spread across the full palette instead of collapsing onto one dominant color, and swapped out two palette colors that were blending into the ocean background.
+
+**V4 changes:** ~197 UN member countries (attempted via 10m data — see V6 fix above); fixed click detection on touch devices using d3's click-distance tolerance; question card now minimal (just emoji + skip button); Jammu & Kashmir, Ladakh, Aksai Chin, Shaksgam Valley, and Pakistan-administered Kashmir now displayed with India's color to show regional grouping, with clear borders to denote their disputed status.
 
 **V3 changes:** much higher max zoom (up to 40×) plus an invisible wider tap-margin; switched to 50m data for better Caribbean/Pacific coverage; missed/skipped countries now pan/zoom and pulse on the map; fixed continent-classification bug for dateline-crossing Pacific nations.
 
@@ -16,6 +20,12 @@ A modern, pinch-zoomable geography game: you're given a country name and you tap
 - Pinch-to-zoom and drag-to-pan on touch devices, plus on-screen zoom buttons for desktop/mouse, zoomable up to 40×. Country borders are thin hairlines that stay thin at any zoom level (non-scaling stroke), and every country has an invisible slightly-wider tap margin so thin or small shapes (Portugal, small islands) are easier to hit precisely.
 - Miss a country or skip it, and the map pans and zooms in on the correct one, pulsing its border for a moment, before moving on.
 - Warm, editorial visual style (Fraunces serif display + Inter body) rather than a generic dashboard look.
+
+## Territories and dependencies
+
+The quiz targets only legitimate sovereign countries (~197: the 193 UN members plus Vatican, Palestine, Kosovo, and Taiwan). Overseas territories and dependencies — Greenland, Puerto Rico, Hong Kong, French Guiana, and roughly 50 others — are filtered out of the question pool via a curated name list (`EXCLUDE_FROM_QUIZ` in `script.js`) and colored the same as their administering country (`DEPENDENCY_PARENT`), so clicking one counts as answering for that country.
+
+This filtering matches against the exact "name" property in the map data, so it's inherently best-effort — if you spot a territory still showing up as its own quiz question, add its exact on-screen name to `EXCLUDE_FROM_QUIZ` (and to `DEPENDENCY_PARENT` if you want it colored with a parent country).
 
 ## The disputed Kashmir region
 

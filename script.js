@@ -3,15 +3,21 @@
    Data: Natural Earth via world-atlas (CDN), TopoJSON
    ============================================================ */
 
-// 10m resolution for complete UN country coverage (~197 countries)
-const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-10m.json";
+// 50m resolution — confirmed to exist in the world-atlas CDN package.
+// (V5 pointed this at countries-10m.json hoping for full UN coverage, but
+// that file isn't published in this package, so the fetch silently failed
+// and no countries ever drew — which is why the map went blank/green.
+// We now hit the ~197 UN-country target differently: by excluding known
+// dependencies/territories from the quiz below, rather than by dataset
+// resolution — see EXCLUDE_FROM_QUIZ.)
+const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json";
 const MAX_MISTAKES = 5;
 const SAME_CONTINENT_PROBABILITY = 0.72; // chance the next country stays in-region
 const REVEAL_ZOOM_MS = 650;    // pan/zoom duration when pointing to a missed country
 const REVEAL_HOLD_MS = 1700;   // how long we linger before the next question
 
-const STORAGE_HISTORY_KEY = "geoGame.history.v4";
-const STORAGE_HIGH_KEY = "geoGame.highScore.v4";
+const STORAGE_HISTORY_KEY = "geoGame.history.v6";
+const STORAGE_HIGH_KEY = "geoGame.highScore.v6";
 
 /* ---------- Regions whose sovereignty is contested: Jammu & Kashmir,
    Ladakh, Aksai Chin, Shaksgam Valley, Pakistan-administered Kashmir.
@@ -70,6 +76,77 @@ const disputedFeatureCollection = {
 };
 
 let indiaColorIndex = -1; // will be set once features load
+
+/* ---------- Dependencies & overseas territories: not asked as separate
+   quiz countries, and drawn with their administering country's color so
+   they read as part of that country rather than their own entity.
+   Name matching is best-effort against Natural Earth's "name" property —
+   if you spot a territory still being quizzed, add its exact on-map name
+   to EXCLUDE_FROM_QUIZ (and to DEPENDENCY_PARENT if it has a clear parent). ---------- */
+
+const EXCLUDE_FROM_QUIZ = new Set([
+  "Greenland", "Puerto Rico", "French Guiana", "Guadeloupe", "Martinique",
+  "Mayotte", "Réunion", "Reunion", "French Polynesia", "New Caledonia",
+  "Saint Pierre and Miquelon", "Wallis and Futuna", "Saint Barthelemy",
+  "Saint Martin", "Fr. S. Antarctic Lands", "French Southern and Antarctic Lands",
+  "Hong Kong", "Hong Kong S.A.R.", "Macao", "Macau", "Macau S.A.R.",
+  "Faroe Islands", "Faroe Is.", "Bermuda", "Cayman Islands", "Cayman Is.",
+  "British Virgin Islands", "British Virgin Is.", "Turks and Caicos Islands",
+  "Turks and Caicos Is.", "Falkland Islands", "Falkland Is.", "Gibraltar",
+  "Isle of Man", "Jersey", "Guernsey", "Anguilla", "Montserrat",
+  "Saint Helena", "Saint Helena, Ascension and Tristan da Cunha",
+  "British Indian Ocean Territory", "Pitcairn Islands", "Pitcairn",
+  "South Georgia and the Islands", "South Georgia and South Sandwich Islands",
+  "Aruba", "Curaçao", "Curacao", "Sint Maarten", "Bonaire", "Sint Eustatius",
+  "American Samoa", "Guam", "Northern Mariana Islands", "N. Mariana Islands",
+  "United States Virgin Islands", "U.S. Virgin Islands", "U.S. Virgin Is.",
+  "Norfolk Island", "Christmas Island", "Cocos Islands", "Cocos (Keeling) Islands",
+  "Cook Islands", "Niue", "Tokelau", "Svalbard", "Svalbard and Jan Mayen",
+  "Åland", "Aland", "Åland Islands",
+  // Contested areas with no single administering "parent" — excluded from
+  // the quiz but left with their own neutral color, same reasoning as the
+  // Kashmir region above (not assigned to any one claimant).
+  "Western Sahara", "W. Sahara", "Somaliland", "N. Cyprus", "Northern Cyprus",
+  "Akrotiri and Dhekelia", "Bouvet Island", "Heard Island and McDonald Islands",
+  "French Southern Territories",
+]);
+
+const DEPENDENCY_PARENT = {
+  "Greenland": "Denmark", "Faroe Islands": "Denmark", "Faroe Is.": "Denmark",
+  "Puerto Rico": "United States of America",
+  "American Samoa": "United States of America",
+  "Guam": "United States of America",
+  "Northern Mariana Islands": "United States of America", "N. Mariana Islands": "United States of America",
+  "United States Virgin Islands": "United States of America",
+  "U.S. Virgin Islands": "United States of America", "U.S. Virgin Is.": "United States of America",
+  "French Guiana": "France", "Guadeloupe": "France", "Martinique": "France",
+  "Mayotte": "France", "Réunion": "France", "Reunion": "France",
+  "French Polynesia": "France", "New Caledonia": "France",
+  "Saint Pierre and Miquelon": "France", "Wallis and Futuna": "France",
+  "Saint Barthelemy": "France", "Saint Martin": "France",
+  "Fr. S. Antarctic Lands": "France", "French Southern and Antarctic Lands": "France",
+  "Hong Kong": "China", "Hong Kong S.A.R.": "China",
+  "Macao": "China", "Macau": "China", "Macau S.A.R.": "China",
+  "Bermuda": "United Kingdom", "Cayman Islands": "United Kingdom", "Cayman Is.": "United Kingdom",
+  "British Virgin Islands": "United Kingdom", "British Virgin Is.": "United Kingdom",
+  "Turks and Caicos Islands": "United Kingdom", "Turks and Caicos Is.": "United Kingdom",
+  "Falkland Islands": "United Kingdom", "Falkland Is.": "United Kingdom",
+  "Gibraltar": "United Kingdom", "Isle of Man": "United Kingdom",
+  "Jersey": "United Kingdom", "Guernsey": "United Kingdom",
+  "Anguilla": "United Kingdom", "Montserrat": "United Kingdom",
+  "Saint Helena": "United Kingdom", "Saint Helena, Ascension and Tristan da Cunha": "United Kingdom",
+  "British Indian Ocean Territory": "United Kingdom",
+  "Pitcairn Islands": "United Kingdom", "Pitcairn": "United Kingdom",
+  "South Georgia and the Islands": "United Kingdom",
+  "South Georgia and South Sandwich Islands": "United Kingdom",
+  "Aruba": "Netherlands", "Curaçao": "Netherlands", "Curacao": "Netherlands",
+  "Sint Maarten": "Netherlands", "Bonaire": "Netherlands", "Sint Eustatius": "Netherlands",
+  "Norfolk Island": "Australia", "Christmas Island": "Australia",
+  "Cocos Islands": "Australia", "Cocos (Keeling) Islands": "Australia",
+  "Cook Islands": "New Zealand", "Niue": "New Zealand", "Tokelau": "New Zealand",
+  "Svalbard": "Norway", "Svalbard and Jan Mayen": "Norway",
+  "Åland": "Finland", "Aland": "Finland", "Åland Islands": "Finland",
+};
 
 /* ---------- DOM refs ---------- */
 
@@ -179,6 +256,8 @@ let features = [];      // array of geojson features, index = id
 let neighborsOf = [];    // array of neighbor index arrays
 let continentOf = [];    // array of continent strings
 let nameOf = [];
+let sovereignIndices = []; // feature indices that are legitimate quiz targets
+let parentIndexOf = [];    // for a dependency, the index of its administering country; else null
 
 let game = {
   active: false,
@@ -188,6 +267,13 @@ let game = {
   remaining: [],   // indices not yet asked this round
   asked: [],       // indices already asked this round
 };
+
+/* Resolve a clicked feature to the country it should count as — a click on
+   a dependency (e.g. Greenland) counts as its administering country (Denmark). */
+function resolveSovereignIndex(i) {
+  const p = parentIndexOf[i];
+  return (p !== null && p !== undefined) ? p : i;
+}
 
 /* ---------- Load data ---------- */
 
@@ -211,10 +297,21 @@ d3.json(WORLD_URL).then((world) => {
   nameOf = features.map(f => f.properties.name);
   continentOf = features.map(f => continentFromCentroid(d3.geoCentroid(f)));
 
+  const nameToIndex = new Map(nameOf.map((n, i) => [n, i]));
+  parentIndexOf = nameOf.map((name) => {
+    const parentName = DEPENDENCY_PARENT[name];
+    return (parentName && nameToIndex.has(parentName)) ? nameToIndex.get(parentName) : null;
+  });
+  sovereignIndices = features.map((_, i) => i).filter(i => !EXCLUDE_FROM_QUIZ.has(nameOf[i]));
+
   assignColors();
   drawMap();
   loadHighScore();
   renderHistory();
+}).catch((err) => {
+  console.error("Failed to load map data:", err);
+  els.promptCountry.textContent = "⚠️";
+  showToast("Map data failed to load — check your connection and reload the page", "bad");
 });
 
 /* ---------- Graph coloring: no two neighboring countries share a color ---------- */
@@ -242,6 +339,12 @@ function assignColors() {
     if (used.has(c)) c = nextExtra++; // rare: more neighbors than palette colors
 
     colorIndexOf[i] = c;
+  });
+
+  // Dependencies/territories inherit their administering country's color,
+  // so they read visually as part of that country rather than their own entity.
+  parentIndexOf.forEach((parentI, i) => {
+    if (parentI !== null && parentI !== undefined) colorIndexOf[i] = colorIndexOf[parentI];
   });
 
   features.forEach((f, i) => { f.__colorIndex = colorIndexOf[i]; });
@@ -302,13 +405,13 @@ els.skipBtn.addEventListener("click", () => {
 });
 
 function startGame() {
-  if (!features.length) return;
+  if (!sovereignIndices.length) return;
   game = {
     active: true,
     score: 0,
     mistakes: 0,
     targetIndex: null,
-    remaining: features.map((_, i) => i),
+    remaining: sovereignIndices.slice(),
     asked: [],
   };
   els.skipBtn.disabled = false;
@@ -343,7 +446,8 @@ function handleCountryClick(clickedIndex) {
   if (!game.active) return;
 
   const target = game.targetIndex;
-  const isCorrect = clickedIndex === target;
+  const resolved = resolveSovereignIndex(clickedIndex); // a territory click counts as its parent country
+  const isCorrect = resolved === target;
 
   if (isCorrect) {
     game.score++;
@@ -357,7 +461,7 @@ function handleCountryClick(clickedIndex) {
     const wrongEl = countryLayer.select(`path[data-index="${clickedIndex}"]`);
     wrongEl.classed("wrong-flash", true);
     setTimeout(() => wrongEl.classed("wrong-flash", false), 650);
-    showToast(`That was ${nameOf[clickedIndex]} — here's ${nameOf[target]}`, "bad");
+    showToast(`That was ${nameOf[resolved]} — here's ${nameOf[target]}`, "bad");
     revealCountry(target);
     finishTurn(false);
   }
@@ -412,7 +516,7 @@ function endGame(reason) {
   els.skipBtn.disabled = true;
   els.promptCountry.textContent = reason === "completed" ? "🏆" : "🏁";
 
-  saveResult(game.score, game.mistakes, features.length, reason === "completed");
+  saveResult(game.score, game.mistakes, sovereignIndices.length, reason === "completed");
   showResult(reason);
 }
 
@@ -435,7 +539,7 @@ function showToast(msg, kind) {
 
 function showResult(reason) {
   els.resultTitle.textContent = reason === "completed" ? "You placed every country!" : "Game over — 5 misses";
-  els.resultScore.textContent = `${game.score} / ${features.length}`;
+  els.resultScore.textContent = `${game.score} / ${sovereignIndices.length}`;
   els.resultCopy.textContent = reason === "completed"
     ? "Every country on the map, found. That's a full round."
     : "Every round sharpens your map sense. Go again?";
@@ -460,7 +564,7 @@ function saveResult(score, mistakes, total, completed) {
 function loadHighScore() {
   const high = Number(localStorage.getItem(STORAGE_HIGH_KEY) || 0);
   els.highScoreNumber.textContent = high;
-  els.highScoreOutof.textContent = `of ${features.length || "—"} countries`;
+  els.highScoreOutof.textContent = `of ${sovereignIndices.length || "—"} countries`;
 }
 
 function renderHistory() {
