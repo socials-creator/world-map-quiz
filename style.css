@@ -195,15 +195,33 @@ html, body {
 
 .country.correct-flash { fill: var(--good) !important; }
 .country.wrong-flash { fill: var(--bad) !important; }
-.country.answer-flash { stroke: var(--ink); stroke-width: 1.1; }
 
-/* Disputed regions: grey, non-interactive overlay */
+/* Invisible layer above everything, just to widen the tappable area a
+   little for thin/small countries — no visual change, click-detection only */
+.hit-target {
+  fill: transparent;
+  stroke: transparent;
+  stroke-width: 7;
+  vector-effect: non-scaling-stroke;
+  pointer-events: all;
+  cursor: pointer;
+}
+
+/* Shown after a miss or skip to pan/zoom to, and point at, the right answer */
+@keyframes revealPulse {
+  0%, 100% { stroke: var(--terracotta-dark); stroke-width: 1; fill-opacity: 1; }
+  50% { stroke: var(--terracotta-dark); stroke-width: 3.2; fill-opacity: 0.82; }
+}
+.country.reveal-pulse {
+  animation: revealPulse 0.55s ease-in-out 3;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Disputed regions: colored as India with clear borders, non-interactive */
 .disputed-region {
-  fill: var(--disputed);
-  fill-opacity: 0.92;
+  fill-opacity: 0.95;
   stroke: #FBFAF6;
-  stroke-width: 0.25;
-  stroke-dasharray: 1.2 1;
+  stroke-width: 0.4;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
 }
@@ -218,37 +236,30 @@ html, body {
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
-  padding: 12px 22px;
+  padding: 9px 16px;
   text-align: center;
-  max-width: min(92%, 480px);
-}
-
-.prompt-label {
-  display: block;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-soft);
-  margin-bottom: 2px;
+  max-width: min(88%, 140px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
 }
 
 .prompt-country {
   display: block;
-  font-family: 'Fraunces', serif;
-  font-size: 1.5rem;
+  font-size: 2.2rem;
   font-weight: 600;
-  color: var(--terracotta-dark);
+  line-height: 1;
 }
 
 .skip-chip {
   display: inline-block;
-  margin-top: 10px;
   border: none;
   background: var(--cream);
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 6px 14px;
-  font-size: 0.76rem;
+  padding: 4px 10px;
+  font-size: 0.7rem;
   font-weight: 600;
   color: var(--ink-soft);
   cursor: pointer;

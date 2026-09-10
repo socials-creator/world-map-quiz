@@ -3,33 +3,59 @@
    Data: Natural Earth via world-atlas (CDN), TopoJSON
    ============================================================ */
 
-const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+// 10m resolution for complete UN country coverage (~197 countries)
+const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-10m.json";
 const MAX_MISTAKES = 5;
 const SAME_CONTINENT_PROBABILITY = 0.72; // chance the next country stays in-region
+const REVEAL_ZOOM_MS = 650;    // pan/zoom duration when pointing to a missed country
+const REVEAL_HOLD_MS = 1700;   // how long we linger before the next question
 
-const STORAGE_HISTORY_KEY = "geoGame.history.v2";
-const STORAGE_HIGH_KEY = "geoGame.highScore.v2";
+const STORAGE_HISTORY_KEY = "geoGame.history.v4";
+const STORAGE_HIGH_KEY = "geoGame.highScore.v4";
 
-/* ---------- Rough, simplified outlines for regions whose sovereignty is
-   disputed between neighboring countries. Drawn as a neutral grey overlay,
-   excluded from the quiz. Coordinates are deliberately simplified — this is
-   a gameplay aid, not a legal/political boundary reference. ---------- */
+/* ---------- Regions whose sovereignty is contested: Jammu & Kashmir,
+   Ladakh, Aksai Chin, Shaksgam Valley, Pakistan-administered Kashmir.
+   These are drawn with India's color and clear borders. Excluded from quiz. ---------- */
 
 const DISPUTED_REGIONS = [
   {
+    name: "Jammu & Kashmir",
+    coordinates: [[[
+      [74.50, 32.20], [75.20, 32.30], [76.10, 32.50], [76.80, 33.20],
+      [76.95, 34.20], [77.25, 35.00], [76.95, 35.85], [76.35, 36.40],
+      [75.65, 36.60], [75.10, 36.30], [74.75, 35.50], [74.40, 34.80],
+      [74.50, 32.20]
+    ]]]
+  },
+  {
+    name: "Ladakh",
+    coordinates: [[[
+      [77.25, 32.80], [78.60, 32.50], [79.20, 33.05], [79.65, 34.00],
+      [80.05, 35.20], [79.75, 36.05], [78.85, 35.95], [77.95, 35.30],
+      [77.45, 34.50], [77.25, 32.80]
+    ]]]
+  },
+  {
     name: "Aksai Chin",
     coordinates: [[[
-      [78.35, 34.95], [78.85, 34.35], [79.45, 34.05], [80.15, 34.25],
-      [80.45, 34.85], [80.05, 35.35], [79.35, 35.55], [78.65, 35.30],
-      [78.35, 34.95]
+      [78.40, 34.90], [79.00, 34.30], [79.50, 34.05], [80.20, 34.25],
+      [80.50, 34.95], [80.10, 35.40], [79.40, 35.60], [78.70, 35.35],
+      [78.40, 34.90]
+    ]]]
+  },
+  {
+    name: "Shaksgam Valley",
+    coordinates: [[[
+      [75.80, 35.85], [76.45, 35.70], [77.10, 36.20], [76.70, 36.85],
+      [76.05, 36.70], [75.80, 35.85]
     ]]]
   },
   {
     name: "Pakistan-administered Kashmir",
     coordinates: [[[
-      [73.00, 33.75], [73.95, 33.35], [74.85, 33.55], [75.75, 34.30],
-      [76.85, 34.95], [77.05, 35.95], [76.55, 36.75], [75.55, 36.95],
-      [74.35, 36.75], [73.35, 36.00], [72.75, 34.85], [73.00, 33.75]
+      [73.10, 33.80], [74.00, 33.40], [74.90, 33.60], [75.80, 34.35],
+      [76.90, 35.00], [77.10, 36.00], [76.60, 36.80], [75.60, 36.90],
+      [74.40, 36.75], [73.40, 36.05], [72.85, 34.90], [73.10, 33.80]
     ]]]
   }
 ];
@@ -43,6 +69,8 @@ const disputedFeatureCollection = {
   }))
 };
 
+let indiaColorIndex = -1; // will be set once features load
+
 /* ---------- DOM refs ---------- */
 
 const els = {
@@ -52,7 +80,6 @@ const els = {
   liveRemaining: document.getElementById("live-remaining"),
   newGameBtn: document.getElementById("new-game-btn"),
   skipBtn: document.getElementById("skip-btn"),
-  promptLabel: document.getElementById("prompt-label"),
   promptCountry: document.getElementById("prompt-country"),
   feedbackToast: document.getElementById("feedback-toast"),
   highScoreNumber: document.getElementById("high-score-number"),
@@ -73,6 +100,11 @@ const els = {
   zoomReset: document.getElementById("zoom-reset"),
 };
 
+// Verify all required elements exist
+if (!els.map || !els.newGameBtn || !els.promptCountry) {
+  console.error("Missing critical DOM elements — page may not have loaded fully");
+}
+
 /* ---------- Map setup ---------- */
 
 let width = els.map.clientWidth;
@@ -84,18 +116,22 @@ const svg = d3.select("#map").append("svg")
 const g = svg.append("g");
 const countryLayer = g.append("g").attr("class", "country-layer");
 const disputedLayer = g.append("g").attr("class", "disputed-layer");
+const hitLayer = g.append("g").attr("class", "hit-layer"); // invisible, wider tap targets, always on top
 
 const projection = d3.geoNaturalEarth1();
 const path = d3.geoPath(projection);
 
+const MAX_SCALE = 40; // was 10 in V1/V2 — needed to comfortably tap small countries
+
 const zoomBehavior = d3.zoom()
-  .scaleExtent([1, 10])
+  .scaleExtent([1, MAX_SCALE])
+  .clickTolerance(5)  // any movement < 5px treated as click, not drag — fixes touch detection
   .on("zoom", (event) => g.attr("transform", event.transform));
 
 svg.call(zoomBehavior).on("dblclick.zoom", null);
 
-els.zoomIn.addEventListener("click", () => svg.transition().duration(200).call(zoomBehavior.scaleBy, 1.5));
-els.zoomOut.addEventListener("click", () => svg.transition().duration(200).call(zoomBehavior.scaleBy, 1 / 1.5));
+els.zoomIn.addEventListener("click", () => svg.transition().duration(200).call(zoomBehavior.scaleBy, 1.7));
+els.zoomOut.addEventListener("click", () => svg.transition().duration(200).call(zoomBehavior.scaleBy, 1 / 1.7));
 els.zoomReset.addEventListener("click", () => svg.transition().duration(300).call(zoomBehavior.transform, d3.zoomIdentity));
 
 window.addEventListener("resize", () => {
@@ -105,6 +141,7 @@ window.addEventListener("resize", () => {
   projection.fitSize([width, height], { type: "Sphere" });
   countryLayer.selectAll("path.country").attr("d", path);
   disputedLayer.selectAll("path.disputed-region").attr("d", path);
+  hitLayer.selectAll("path.hit-target").attr("d", path);
 });
 
 /* ---------- Palette for neighbor-safe coloring ---------- */
@@ -124,10 +161,13 @@ function colorForIndex(i) {
 /* ---------- Rough continent bucket from centroid, used only to bias question order ---------- */
 
 function continentFromCentroid([lon, lat]) {
+  // Pacific nations near the antimeridian can have centroid longitude
+  // reported as either strongly positive or strongly negative — handle
+  // both ends first so e.g. Samoa/Fiji/Tonga land in Oceania, not the Americas.
+  if (lon >= 110 || lon <= -130) return lat > 15 ? "Asia" : "Oceania";
   if (lon < -30) return lat > 15 ? "North America" : "South America";
   if (lon < 60) return lat > 30 ? "Europe" : "Africa";
-  if (lon < 170) return lat > -10 ? "Asia" : "Oceania";
-  return "Oceania";
+  return lat > -10 ? "Asia" : "Oceania";
 }
 
 /* ---------- Game state ---------- */
@@ -196,22 +236,40 @@ function assignColors() {
 function drawMap() {
   projection.fitSize([width, height], { type: "Sphere" });
 
+  // Find India's color index for disputed regions
+  const indiaIndex = features.findIndex(f => f.properties.name === "India");
+  indiaColorIndex = indiaIndex >= 0 ? features[indiaIndex].__colorIndex : 0;
+
+  // Visual layer only — click handling lives on the invisible hit-layer
+  // drawn on top of this (see below), which gives small countries a wider
+  // effective tap target without changing how thin the visible border is.
   countryLayer.selectAll("path.country")
     .data(features)
     .join("path")
     .attr("class", "country")
     .attr("d", path)
     .attr("fill", d => colorForIndex(d.__colorIndex))
-    .attr("data-index", (d, i) => i)
-    .on("click", (event, d) => handleCountryClick(features.indexOf(d)));
+    .attr("data-index", (d, i) => i);
 
-  // Disputed regions: drawn on top, grey, purely visual (clicks pass through
-  // to the country beneath so gameplay is unaffected).
+  // Disputed regions: drawn with India's color, clear borders, visual grouping.
+  // Not part of the quiz (excluded from questions and not clickable).
   disputedLayer.selectAll("path.disputed-region")
     .data(disputedFeatureCollection.features)
     .join("path")
     .attr("class", "disputed-region")
-    .attr("d", path);
+    .attr("d", path)
+    .attr("fill", colorForIndex(indiaColorIndex));
+
+  // Invisible hit layer on top of everything: a few extra screen-pixels of
+  // tappable margin around each country's true border, so thin or tiny
+  // shapes (Portugal, small islands) are easier to hit precisely.
+  hitLayer.selectAll("path.hit-target")
+    .data(features)
+    .join("path")
+    .attr("class", "hit-target")
+    .attr("d", path)
+    .attr("data-index", (d, i) => i)
+    .on("click", (event, d) => handleCountryClick(features.indexOf(d)));
 }
 
 /* ---------- Game flow ---------- */
@@ -221,9 +279,10 @@ els.playAgainBtn.addEventListener("click", () => { closeResult(); startGame(); }
 els.closeResultBtn.addEventListener("click", closeResult);
 els.skipBtn.addEventListener("click", () => {
   if (!game.active) return;
-  showToast(`It was ${nameOf[game.targetIndex]}`, "bad");
   game.mistakes++;
-  advance();
+  showToast(`It was ${nameOf[game.targetIndex]}`, "bad");
+  revealCountry(game.targetIndex);
+  finishTurn(false);
 });
 
 function startGame() {
@@ -260,7 +319,6 @@ function pickNext() {
   game.remaining = game.remaining.filter(i => i !== next);
   game.asked.push(next);
 
-  els.promptLabel.textContent = `Country ${game.asked.length} of ${features.length}`;
   els.promptCountry.textContent = nameOf[next];
   updateLiveStats();
 }
@@ -269,42 +327,73 @@ function handleCountryClick(clickedIndex) {
   if (!game.active) return;
 
   const target = game.targetIndex;
-  const el = countryLayer.select(`path[data-index="${clickedIndex}"]`);
+  const isCorrect = clickedIndex === target;
 
-  if (clickedIndex === target) {
+  if (isCorrect) {
     game.score++;
     showToast("Correct!", "good");
+    const el = countryLayer.select(`path[data-index="${clickedIndex}"]`);
     el.classed("correct-flash", true);
     setTimeout(() => el.classed("correct-flash", false), 500);
+    finishTurn(true);
   } else {
     game.mistakes++;
-    showToast(`That was ${nameOf[clickedIndex]} — target was ${nameOf[target]}`, "bad");
-    el.classed("wrong-flash", true);
-    countryLayer.select(`path[data-index="${target}"]`).classed("answer-flash", true);
-    setTimeout(() => {
-      el.classed("wrong-flash", false);
-      countryLayer.select(`path[data-index="${target}"]`).classed("answer-flash", false);
-    }, 650);
+    const wrongEl = countryLayer.select(`path[data-index="${clickedIndex}"]`);
+    wrongEl.classed("wrong-flash", true);
+    setTimeout(() => wrongEl.classed("wrong-flash", false), 650);
+    showToast(`That was ${nameOf[clickedIndex]} — here's ${nameOf[target]}`, "bad");
+    revealCountry(target);
+    finishTurn(false);
   }
-
-  advance();
 }
 
-function advance() {
+/* Pans/zooms the map to center on a country and pulses its border, so a
+   miss or skip visibly points at the right answer rather than just naming it. */
+function revealCountry(index) {
+  const feature = features[index];
+  const el = countryLayer.select(`path[data-index="${index}"]`);
+  el.raise().classed("reveal-pulse", true);
+  setTimeout(() => el.classed("reveal-pulse", false), REVEAL_HOLD_MS - 50);
+
+  const bounds = path.bounds(feature);
+  const [[x0, y0], [x1, y1]] = bounds;
+  const bw = x1 - x0, bh = y1 - y0;
+  if (!bw || !bh) return;
+
+  const pad = 90;
+  const scale = Math.max(1, Math.min(MAX_SCALE * 0.7, 0.9 / Math.max(bw / (width - pad), bh / (height - pad))));
+  const tx = width / 2 - scale * (x0 + bw / 2);
+  const ty = height / 2 - scale * (y0 + bh / 2);
+
+  svg.transition().duration(REVEAL_ZOOM_MS).call(
+    zoomBehavior.transform,
+    d3.zoomIdentity.translate(tx, ty).scale(scale)
+  );
+}
+
+function finishTurn(wasCorrect) {
   updateLiveStats();
-  if (game.mistakes >= MAX_MISTAKES) {
-    setTimeout(() => endGame("mistakes"), 500);
-  } else if (!game.remaining.length) {
-    setTimeout(() => endGame("completed"), 500);
-  } else {
-    setTimeout(pickNext, 500);
-  }
+  const delay = wasCorrect ? 500 : REVEAL_HOLD_MS;
+
+  setTimeout(() => {
+    if (game.mistakes >= MAX_MISTAKES) {
+      endGame("mistakes");
+      return;
+    }
+    if (!game.remaining.length) {
+      endGame("completed");
+      return;
+    }
+    if (!wasCorrect) {
+      svg.transition().duration(500).call(zoomBehavior.transform, d3.zoomIdentity);
+    }
+    pickNext();
+  }, delay);
 }
 
 function endGame(reason) {
   game.active = false;
   els.skipBtn.disabled = true;
-  els.promptLabel.textContent = reason === "completed" ? "All countries found!" : "Game over";
   els.promptCountry.textContent = reason === "completed" ? "🏆" : "🏁";
 
   saveResult(game.score, game.mistakes, features.length, reason === "completed");

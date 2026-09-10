@@ -2,7 +2,9 @@
 
 A modern, pinch-zoomable geography game: you're given a country name and you tap it on the map. Built as static HTML/CSS/JS — no build step, no backend, deploys straight to GitHub Pages.
 
-**V2 changes:** thinner borders, disputed regions (Aksai Chin, Pakistan-administered Kashmir) shown as a neutral grey overlay outside the quiz, New Game + Last 10 Games moved onto the home screen instead of behind the hamburger, and rounds now run until every country is placed or you rack up 5 misses.
+**V4 changes:** ~197 UN member countries (switched to 10m-resolution data); fixed click detection on touch devices using d3's `clickTolerance`; question card now minimal (just emoji + skip button); Jammu & Kashmir, Ladakh, Aksai Chin, Shaksgam Valley, and Pakistan-administered Kashmir now displayed with India's color to show regional grouping, with clear borders to denote their disputed status.
+
+**V3 changes:** much higher max zoom (up to 40×) plus an invisible wider tap-margin; switched to 50m data for better Caribbean/Pacific coverage; missed/skipped countries now pan/zoom and pulse on the map; fixed continent-classification bug for dateline-crossing Pacific nations.
 
 ## Features
 
@@ -11,8 +13,13 @@ A modern, pinch-zoomable geography game: you're given a country name and you tap
 - The hamburger (☰) now only holds secondary, check-occasionally info: highest score, how a round works, and the map legend — not anything needed to start or track a game.
 - Every country is colored so that **no two neighboring countries share a color** — computed automatically at load time from each country's actual border adjacency (graph coloring).
 - Disputed regions (Aksai Chin, Pakistan-administered Kashmir) are drawn as a neutral grey overlay, excluded from the quiz — see "A note on borders" below.
-- Pinch-to-zoom and drag-to-pan on touch devices, plus on-screen zoom buttons for desktop/mouse. Country borders are thin hairlines that stay thin at any zoom level (non-scaling stroke).
+- Pinch-to-zoom and drag-to-pan on touch devices, plus on-screen zoom buttons for desktop/mouse, zoomable up to 40×. Country borders are thin hairlines that stay thin at any zoom level (non-scaling stroke), and every country has an invisible slightly-wider tap margin so thin or small shapes (Portugal, small islands) are easier to hit precisely.
+- Miss a country or skip it, and the map pans and zooms in on the correct one, pulsing its border for a moment, before moving on.
 - Warm, editorial visual style (Fraunces serif display + Inter body) rather than a generic dashboard look.
+
+## The disputed Kashmir region
+
+The area comprising Jammu & Kashmir, Ladakh, Aksai Chin, Shaksgam Valley, and Pakistan-administered Kashmir is displayed with the same fill color as India, but with clear borders to denote their disputed status. This is a visual choice to show regional grouping; the borders are simplified reference lines for gameplay, not a legal boundary. These regions are excluded from the quiz (you're never asked to name them individually).
 
 ## Files
 
@@ -64,8 +71,11 @@ Two specific areas — **Aksai Chin** (administered by China, claimed by India) 
 
 ## Customizing
 
-- **Ending conditions**: change `MAX_MISTAKES` in `script.js` (currently 5; a round also always ends once every country has been asked).
+- **Country dataset**: change `WORLD_URL` in `script.js` to point to a different TopoJSON source (currently uses Natural Earth 10m via `world-atlas@2`).
+- **Ending conditions**: change `MAX_MISTAKES` (currently 5; a round also ends once every country has been asked).
 - **How often it jumps continents**: change `SAME_CONTINENT_PROBABILITY` (0–1, higher = stays local more).
+- **Click tolerance**: change `clickTolerance()` in the `zoomBehavior` definition (currently 5px — any movement smaller is treated as a click, not a drag).
 - **Color palette**: edit the `PALETTE` array in `script.js`.
 - **Disputed region outlines**: edit the `DISPUTED_REGIONS` constant in `script.js`.
 - **Fonts / colors**: edit the `:root` variables at the top of `style.css`.
+- **Question card size**: edit the `.prompt-card` CSS class.
