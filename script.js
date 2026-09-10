@@ -347,6 +347,7 @@ function assignColors() {
     .sort((a, b) => neighborsOf[b].length - neighborsOf[a].length);
 
   let nextExtra = PALETTE.length; // only used if a node's neighbors exhaust the whole palette
+  const colorOffset = Math.floor(Math.random() * PALETTE.length); // randomizes the starting point each call, so colors differ per game
 
   order.forEach((i) => {
     const used = new Set(neighborsOf[i].map(n => colorIndexOf[n]).filter(c => c !== -1));
@@ -354,8 +355,9 @@ function assignColors() {
     // Countries with no neighbors (most islands) have nothing constraining
     // their color, so a fixed starting point would send all of them to the
     // same color. Rotate the starting point by each country's own index
-    // instead, so islands spread across the whole palette.
-    let c = i % PALETTE.length;
+    // (plus the per-game random offset above) instead, so islands spread
+    // across the whole palette and the palette itself shifts each game.
+    let c = (i + colorOffset) % PALETTE.length;
     let tries = 0;
     while (used.has(c) && tries < PALETTE.length) {
       c = (c + 1) % PALETTE.length;
@@ -475,6 +477,16 @@ els.skipBtn.addEventListener("click", () => {
 
 function startGame() {
   if (!sovereignIndices.length) return;
+
+  // Re-roll the color assignment each game (see the random colorOffset in
+  // assignColors()) and repaint the already-drawn map with the new colors,
+  // rather than only coloring once at initial load.
+  assignColors();
+  countryLayer.selectAll("path.country").attr("fill", d => colorForIndex(d.__colorIndex));
+  const indiaIdxForRepaint = features.findIndex(f => f.properties.name === "India");
+  indiaColorIndex = indiaIdxForRepaint >= 0 ? features[indiaIdxForRepaint].__colorIndex : 0;
+  disputedLayer.selectAll("path.disputed-region").attr("fill", colorForIndex(indiaColorIndex));
+
   game = {
     active: true,
     score: 0,

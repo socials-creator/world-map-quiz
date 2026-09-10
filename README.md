@@ -2,6 +2,9 @@
 
 A modern, pinch-zoomable geography game: you're given a country name and you tap it on the map. Built as static HTML/CSS/JS — no build step, no backend, deploys straight to GitHub Pages.
 
+**V10 changes:**
+- Country colors now shift each time you start a new game (New Game / Play Again), instead of staying fixed for the whole session. The neighbor-coloring rule (no two adjacent countries share a color) is still respected — only the starting point in the palette is randomized.
+
 **V9 changes:**
 - **Fixed: long country names got cut off in the question box.** The prompt card had a hard `140px` max-width and a fixed `2.2rem` font size, so longer names (e.g. "Democratic Republic of the Congo") overflowed or were clipped. The card now grows up to ~340px, the name scales down smoothly for longer text (`clamp()`), and wraps onto a second line if needed instead of being cut off.
 - Updated the map legend copy for Jammu & Kashmir / Ladakh.
