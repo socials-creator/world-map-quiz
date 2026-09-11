@@ -231,7 +231,7 @@ const path = d3.geoPath(projection);
 // roughly a centimeter or more of screen width on a typical phone, since
 // the Natural Earth 50m projection scale means each 10x of zoom roughly
 // 10x's the rendered size of any given shape.
-const MAX_SCALE = 120;
+const MAX_SCALE = 100;
 
 const zoomBehavior = d3.zoom()
   .scaleExtent([1, MAX_SCALE])
