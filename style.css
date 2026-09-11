@@ -11,6 +11,8 @@
   --good: #3F8C5F;
   --bad: #C24E4E;
   --disputed: #ADA79B;
+  --ocean-dark-1: #0B1420;
+  --ocean-dark-2: #0E1B26;
   --radius-lg: 20px;
   --radius-md: 14px;
   --radius-sm: 9px;
@@ -36,7 +38,6 @@ html, body {
   height: 100dvh;
   display: flex;
   flex-direction: column;
-  /* iOS safe area */
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }
@@ -80,13 +81,11 @@ html, body {
   justify-content: center;
 }
 
-/* Sidebar toggle only shown in landscape */
 .btn-sidebar-toggle {
   display: none;
   margin-left: auto;
 }
 
-/* Push hamburger to right in portrait */
 #menu-toggle { margin-left: auto; }
 
 /* ========== Portrait-only controls ========== */
@@ -190,7 +189,7 @@ html, body {
 /* ========== Landscape sidebar ========== */
 
 .landscape-sidebar {
-  display: none; /* shown only in landscape via media query below */
+  display: none;
   flex-direction: column;
   flex-shrink: 0;
   width: var(--ls-sidebar-width);
@@ -200,7 +199,6 @@ html, body {
   overflow-y: auto;
   transition: width 0.22s ease;
   gap: 0;
-  /* Ensure it never intercepts map taps (it sits beside the map, not over it) */
   position: relative;
   z-index: 5;
   -webkit-overflow-scrolling: touch;
@@ -302,15 +300,12 @@ html, body {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  background: linear-gradient(180deg, #EAF2F1 0%, #E7EEE8 100%);
+  background: linear-gradient(180deg, var(--ocean-dark-1) 0%, var(--ocean-dark-2) 100%);
 }
 
 .map-canvas {
   width: 100%;
   height: 100%;
-  /* touch-action: none tells the browser we handle all touch events
-     ourselves via pointer events. This is essential — but we also need
-     the SVG to fill the canvas exactly so getScreenCTM() is accurate. */
   touch-action: none;
   cursor: grab;
   display: block;
@@ -318,10 +313,6 @@ html, body {
 .map-canvas:active { cursor: grabbing; }
 .map-canvas svg {
   display: block;
-  /* Do NOT use CSS width/height:100% here — that creates a mismatch
-     between the SVG's coordinate space and its CSS layout size, which
-     breaks getScreenCTM()-based coordinate conversion. We set explicit
-     pixel width/height attributes in JS instead. */
   overflow: hidden;
 }
 
@@ -336,7 +327,6 @@ html, body {
 .country.correct-flash { fill: var(--good) !important; }
 .country.wrong-flash { fill: var(--bad) !important; }
 
-/* Hit targets: invisible but tappable */
 .hit-target {
   fill: transparent;
   stroke: transparent;
@@ -347,7 +337,6 @@ html, body {
   touch-action: none;
 }
 
-/* Reveal pulse animation */
 @keyframes revealPulse {
   0%, 100% { stroke: var(--terracotta-dark); stroke-width: 1; fill-opacity: 1; }
   50% { stroke: var(--terracotta-dark); stroke-width: 3.5; fill-opacity: 0.8; }
@@ -357,7 +346,6 @@ html, body {
   vector-effect: non-scaling-stroke;
 }
 
-/* Disputed regions */
 .disputed-region {
   fill-opacity: 0.95;
   stroke: #FBFAF6;
@@ -416,8 +404,6 @@ html, body {
 
 .feedback-toast {
   position: absolute;
-  /* Landscape: near the top since no prompt card overlaps.
-     Portrait: below the prompt card. Overridden in landscape media query. */
   top: 80px;
   left: 50%;
   transform: translateX(-50%) translateY(-8px);
@@ -613,38 +599,26 @@ html, body {
 
 /* ========================================================
    LANDSCAPE LAYOUT
-   Applied when the device/window is wider than it is tall.
-   On iOS this fires correctly on orientation change.
    ======================================================== */
 
 @media (orientation: landscape) {
-
-  /* In landscape the app becomes a horizontal split:
-     [topbar spans full width]
-     [landscape-sidebar | map-stage]
-     No portrait control row or history strip needed. */
 
   .portrait-controls { display: none; }
 
   .btn-sidebar-toggle { display: flex; }
 
-  /* Push hamburger all the way right when sidebar toggle is present */
   #menu-toggle { margin-left: 0; }
 
   .landscape-sidebar {
     display: flex;
   }
 
-  /* Prompt card floats over the map in portrait — hide it in landscape
-     since the sidebar handles the prompt. */
   .portrait-only { display: none !important; }
 
-  /* Toast: move to very top of map area (no prompt card competing for space) */
   .feedback-toast {
     top: 12px;
   }
 
-  /* Zoom controls: tuck into bottom-right, slightly smaller */
   .zoom-controls {
     bottom: 14px;
     right: 10px;
@@ -655,7 +629,6 @@ html, body {
     font-size: 0.9rem;
   }
 
-  /* Compact topbar in landscape — saves vertical space */
   .topbar {
     padding: 8px 14px;
   }
@@ -663,8 +636,6 @@ html, body {
   .brand-mark { font-size: 1.1rem; }
 }
 
-/* Short landscape screens (phones in landscape typically ~375–430px tall):
-   make the sidebar even more compact */
 @media (orientation: landscape) and (max-height: 500px) {
   .topbar { padding: 6px 12px; }
   .brand-name { display: none; }
@@ -672,7 +643,7 @@ html, body {
   .ls-country { font-size: 0.9rem; margin-bottom: 5px; }
   .ls-new-game { padding: 7px 10px; font-size: 0.8rem; }
   .ls-stat-value { font-size: 0.9rem; }
-  .ls-history-section { display: none; } /* drop history on very short screens */
+  .ls-history-section { display: none; }
 }
 
 /* ========== Portrait responsive ========== */
