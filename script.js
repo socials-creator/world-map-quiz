@@ -225,7 +225,13 @@ const hitLayer = g.append("g").attr("class", "hit-layer");
 const projection = d3.geoNaturalEarth1();
 const path = d3.geoPath(projection);
 
-const MAX_SCALE = 40;
+// V12: raised from 40 so tiny countries (Monaco, Vatican, Singapore) can
+// actually be seen at a usable on-screen size — at 40x Monaco's ~2km width
+// was still sub-millimeter on screen. 400x gets a country like Monaco to
+// roughly a centimeter or more of screen width on a typical phone, since
+// the Natural Earth 50m projection scale means each 10x of zoom roughly
+// 10x's the rendered size of any given shape.
+const MAX_SCALE = 400;
 
 const zoomBehavior = d3.zoom()
   .scaleExtent([1, MAX_SCALE])
@@ -361,9 +367,33 @@ d3.json(WORLD_URL).then((world) => {
 
   if (!features.length) throw new Error("Zero renderable features after parse.");
 
-  assignColors();
-  drawMap(); // draw first with current (portrait) dimensions…
-  handleResize(); // …then immediately fit to actual container size
+  // --- V12: everything below this point is RENDERING, not data-fetching.
+  // Previously drawMap()/handleResize() ran directly inside this .then(),
+  // so any exception they threw — including from the container having
+  // zero width/height on first paint, which can happen on some mobile
+  // browsers before the viewport/webfonts have finished settling — was
+  // caught by the .catch() below and shown as a misleading "map data
+  // failed to load / check your connection" message, even though the
+  // JSON had already fetched and parsed correctly. That's now isolated
+  // into its own try/catch with its own accurate error message, exactly
+  // like the existing history/high-score isolation further down.
+  try {
+    initialRender();
+  } catch (err) {
+    console.error("Map data loaded, but rendering failed:", err);
+    showToast("Map failed to draw — try rotating or reloading", "bad");
+    // Retry once shortly after — covers the "container had zero size on
+    // first paint" case, which usually resolves itself a moment later.
+    setTimeout(() => {
+      try {
+        initialRender();
+        showToast("Map ready", "good");
+      } catch (err2) {
+        console.error("Retry render also failed:", err2);
+        els.promptCountry.textContent = "⚠️";
+      }
+    }, 300);
+  }
 
   try {
     loadHighScore();
@@ -376,6 +406,14 @@ d3.json(WORLD_URL).then((world) => {
   els.promptCountry.textContent = "⚠️";
   showToast("Map data failed to load — check your connection and reload", "bad");
 });
+
+/* Renders the map for the first time. Separated out so the initial call
+   and the zero-size retry (see above) share identical logic. */
+function initialRender() {
+  assignColors();
+  drawMap();      // draw first with whatever dimensions are available…
+  handleResize(); // …then immediately re-fit to the settled container size
+}
 
 /* ---------- Graph coloring ---------- */
 
