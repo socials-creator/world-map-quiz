@@ -13,37 +13,77 @@
 
 <div class="app">
 
-  <!-- ===== Always-visible top bar: brand + hamburger (secondary info only) ===== -->
+  <!-- ===== Top bar: brand + hamburger ===== -->
   <header class="topbar">
     <div class="brand">
       <span class="brand-mark">🌐</span>
       <span class="brand-name">Where in the World</span>
     </div>
+    <!-- Landscape sidebar toggle (only shown in landscape) -->
+    <button class="btn-icon btn-sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">⊞</button>
     <button class="btn-icon" id="menu-toggle" aria-label="Open high score & info">☰</button>
   </header>
 
-  <!-- ===== Always-visible control row: New Game + live stats (core loop, never hidden) ===== -->
-  <div class="control-row">
-    <button class="btn-primary" id="new-game-btn">New game</button>
-    <div class="live-stats">
-      <div class="stat"><span class="stat-label">Found</span><span class="stat-value" id="live-score">0</span></div>
-      <div class="stat"><span class="stat-label">Missed</span><span class="stat-value" id="live-mistakes">0 / 5</span></div>
-      <div class="stat"><span class="stat-label">Remaining</span><span class="stat-value" id="live-remaining">—</span></div>
+  <!-- ===== Portrait layout: control row + history strip (hidden in landscape) ===== -->
+  <div class="portrait-controls">
+    <div class="control-row">
+      <button class="btn-primary" id="new-game-btn">New game</button>
+      <div class="live-stats">
+        <div class="stat"><span class="stat-label">Found</span><span class="stat-value" id="live-score">0</span></div>
+        <div class="stat"><span class="stat-label">Missed</span><span class="stat-value" id="live-mistakes">0 / 5</span></div>
+        <div class="stat"><span class="stat-label">Left</span><span class="stat-value" id="live-remaining">—</span></div>
+      </div>
+    </div>
+
+    <div class="history-strip">
+      <span class="history-strip-label">Last 10</span>
+      <ol class="history-scroller" id="history-list-portrait">
+        <li class="history-empty">No games yet.</li>
+      </ol>
     </div>
   </div>
 
-  <!-- ===== Always-visible last-10-games strip ===== -->
-  <div class="history-strip">
-    <span class="history-strip-label">Last 10 games</span>
-    <ol class="history-scroller" id="history-list">
-      <li class="history-empty">No games yet — play one to see it here.</li>
-    </ol>
-  </div>
-
+  <!-- ===== Main layout ===== -->
   <div class="layout">
 
+    <!-- ===== Landscape sidebar (left panel, only shown in landscape) ===== -->
+    <aside class="landscape-sidebar" id="landscape-sidebar">
+      <div class="ls-section">
+        <button class="btn-primary ls-new-game" id="new-game-btn-ls">New game</button>
+      </div>
+
+      <div class="ls-section ls-prompt-section" id="ls-prompt-section">
+        <div class="ls-label">Find this country</div>
+        <div class="ls-country" id="ls-prompt-country">🌍</div>
+        <button class="skip-chip ls-skip" id="skip-btn-ls" disabled>Skip →</button>
+      </div>
+
+      <div class="ls-section ls-stats-section">
+        <div class="ls-stat-row">
+          <span class="ls-stat-label">Found</span>
+          <span class="ls-stat-value" id="ls-score">0</span>
+        </div>
+        <div class="ls-stat-row">
+          <span class="ls-stat-label">Missed</span>
+          <span class="ls-stat-value" id="ls-mistakes">0 / 5</span>
+        </div>
+        <div class="ls-stat-row">
+          <span class="ls-stat-label">Remaining</span>
+          <span class="ls-stat-value" id="ls-remaining">—</span>
+        </div>
+      </div>
+
+      <div class="ls-section ls-history-section">
+        <div class="ls-label">Last 10 games</div>
+        <ol class="ls-history-list" id="history-list-landscape">
+          <li class="history-empty">No games yet.</li>
+        </ol>
+      </div>
+    </aside>
+
     <main class="map-stage">
-      <div class="prompt-card" id="prompt-card">
+      <!-- Portrait prompt card (hidden in landscape) -->
+      <div class="prompt-card portrait-only" id="prompt-card">
         <span class="prompt-country" id="prompt-country">🌍</span>
         <button class="skip-chip" id="skip-btn" disabled>Skip →</button>
       </div>
@@ -59,7 +99,7 @@
       </div>
     </main>
 
-    <!-- ===== Secondary drawer: High score + About/legend — one tap away, not core loop ===== -->
+    <!-- ===== Secondary drawer: High score + About ===== -->
     <aside class="drawer" id="sidebar">
       <button class="btn-icon drawer-close" id="drawer-close" aria-label="Close">✕</button>
 
@@ -85,11 +125,8 @@
         <h2 class="panel-title">Map legend</h2>
         <p class="panel-copy">
           <span class="legend-swatch"></span> Jammu and Kashmir, Ladakh are Union
-          territories of India (including Disputed regions — China-administered
-          Kashmir, Pakistan-administered Kashmir) which are legally an integral
-          part of India. However, regrettably, due to map sources being outside
-          India's jurisdiction, the map does not reflect its full intent — borders
-          here are simplified reference lines, not a political statement.
+          territories of India (including Disputed regions) which are legally an integral
+          part of India. Borders here are simplified reference lines, not a political statement.
         </p>
       </section>
     </aside>
