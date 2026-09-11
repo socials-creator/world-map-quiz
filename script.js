@@ -231,7 +231,7 @@ const path = d3.geoPath(projection);
 // roughly a centimeter or more of screen width on a typical phone, since
 // the Natural Earth 50m projection scale means each 10x of zoom roughly
 // 10x's the rendered size of any given shape.
-const MAX_SCALE = 90;
+const MAX_SCALE = 4000;
 
 const zoomBehavior = d3.zoom()
   .scaleExtent([1, MAX_SCALE])
@@ -381,7 +381,7 @@ d3.json(WORLD_URL).then((world) => {
     initialRender();
   } catch (err) {
     console.error("Map data loaded, but rendering failed:", err);
-    showToast("Map failed to draw — try rotating or reloading", "bad");
+    showToast("map", "bad");
     // Retry once shortly after — covers the "container had zero size on
     // first paint" case, which usually resolves itself a moment later.
     setTimeout(() => {
@@ -390,7 +390,7 @@ d3.json(WORLD_URL).then((world) => {
         showToast("Map ready", "good");
       } catch (err2) {
         console.error("Retry render also failed:", err2);
-        els.promptCountry.textContent = "⚠️";
+        els.promptCountry.textContent = "🌏";
       }
     }, 300);
   }
