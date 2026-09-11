@@ -1,29 +1,35 @@
 /* ============================================================
-   Where in the World — geography pointing game (V11)
-   V11 changes:
-   - Fixed: tap/click detection completely broken in landscape on iOS.
-     Root cause: when the device rotates, the SVG viewBox dimensions and
-     the d3 projection are both keyed to the pre-rotation element size.
-     The hit-layer path coordinates are then wrong relative to actual
-     pointer positions. Fix: force a full resize+redraw on orientation
-     change (with a 120ms delay to let iOS finish its reflow), then
-     rebuild the zoom transform so previously-panned/zoomed state maps
-     correctly to the new dimensions.
-   - Fixed: pointer coordinate space mismatch. We now hit-test using
-     SVG-space coordinates (via getScreenCTM inverse) rather than
-     client-space offsets, which are unreliable when the SVG is scaled
-     or when iOS adds safe-area insets in landscape.
-   - Fixed: landscape sidebar overlapping SVG tap area. The sidebar now
-     correctly subtracts its width from the map stage before the
-     projection is fitted.
-   - Added: landscape-optimised sidebar with inline stats, skip, new game,
-     and last-10 history — so in landscape the primary game controls are
-     always visible without any overlay.
-   - Added: sidebar collapse toggle in landscape (the ⊞ button) so users
-     can give the map the full width if they want.
+   Where in the World — geography pointing game (V13)
+   V13 changes:
+   - Swapped the world boundary data source from world-atlas@2
+     (Natural Earth) to the cB-Abhinav-Gautam/World-Map-India-Complete
+     topology, which already draws India's boundary to its full
+     claim (Aksai Chin, Shaksgam Valley, Siachen, PoK) with matching
+     shared borders against Pakistan and China. WORLD_URL now points
+     at a local file, world-topo.json, shipped alongside this repo
+     instead of a CDN.
+   - Removed the DISPUTED_REGIONS overlay hack (Jammu & Kashmir,
+     Ladakh, Aksai Chin, Shaksgam Valley, Pakistan-administered
+     Kashmir polygons drawn in India's color on top of the map).
+     It's no longer needed: the new topology already encodes India's
+     boundary correctly at the source, so there's nothing left to
+     patch over.
+   - Country name property changed from properties.name (lowercase,
+     Natural Earth convention) to properties.NAME (uppercase,
+     matching this dataset's convention). Every place that reads a
+     feature's name was updated to match.
+   - Added "Somaliland" to EXCLUDE_FROM_QUIZ / DEPENDENCY_PARENT:
+     this dataset includes it as its own polygon, but it's an
+     unrecognized breakaway region, not a playable country, so it's
+     colored and treated the same way the existing map already
+     treats Northern Cyprus.
+   Everything else — palette, zoom levels (MAX_SCALE, click
+   distances), tap-detection thresholds, continent-jump logic,
+   scoring, history/high-score persistence, portrait/landscape
+   layouts — is untouched from V11.
    ============================================================ */
 
-const WORLD_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json";
+const WORLD_URL = "./world-topo.json";
 const MAX_MISTAKES = 5;
 const SAME_CONTINENT_PROBABILITY = 0.72;
 const REVEAL_ZOOM_MS = 650;
@@ -37,42 +43,6 @@ const TAP_MAX_DURATION_MS = 600;
 
 const STORAGE_HISTORY_KEY = "geoGame.history.v6";
 const STORAGE_HIGH_KEY = "geoGame.highScore.v6";
-
-/* ---------- Disputed regions (Kashmir etc.) ---------- */
-
-const DISPUTED_REGIONS = [
-  {
-    name: "Jammu & Kashmir",
-    coordinates: [[[ [74.50,32.20],[75.20,32.30],[76.10,32.50],[76.80,33.20],[76.95,34.20],[77.25,35.00],[76.95,35.85],[76.35,36.40],[75.65,36.60],[75.10,36.30],[74.75,35.50],[74.40,34.80],[74.50,32.20] ]]]
-  },
-  {
-    name: "Ladakh",
-    coordinates: [[[ [77.25,32.80],[78.60,32.50],[79.20,33.05],[79.65,34.00],[80.05,35.20],[79.75,36.05],[78.85,35.95],[77.95,35.30],[77.45,34.50],[77.25,32.80] ]]]
-  },
-  {
-    name: "Aksai Chin",
-    coordinates: [[[ [78.40,34.90],[79.00,34.30],[79.50,34.05],[80.20,34.25],[80.50,34.95],[80.10,35.40],[79.40,35.60],[78.70,35.35],[78.40,34.90] ]]]
-  },
-  {
-    name: "Shaksgam Valley",
-    coordinates: [[[ [75.80,35.85],[76.45,35.70],[77.10,36.20],[76.70,36.85],[76.05,36.70],[75.80,35.85] ]]]
-  },
-  {
-    name: "Pakistan-administered Kashmir",
-    coordinates: [[[ [73.10,33.80],[74.00,33.40],[74.90,33.60],[75.80,34.35],[76.90,35.00],[77.10,36.00],[76.60,36.80],[75.60,36.90],[74.40,36.75],[73.40,36.05],[72.85,34.90],[73.10,33.80] ]]]
-  }
-];
-
-const disputedFeatureCollection = {
-  type: "FeatureCollection",
-  features: DISPUTED_REGIONS.map(r => ({
-    type: "Feature",
-    properties: { name: r.name },
-    geometry: { type: "Polygon", coordinates: r.coordinates }
-  }))
-};
-
-let indiaColorIndex = -1;
 
 /* ---------- Territories excluded from quiz ---------- */
 
@@ -135,6 +105,7 @@ const DEPENDENCY_PARENT = {
   "Cook Islands":"New Zealand","Niue":"New Zealand","Tokelau":"New Zealand",
   "Svalbard":"Norway","Svalbard and Jan Mayen":"Norway",
   "Åland":"Finland","Aland":"Finland","Åland Islands":"Finland",
+  "Somaliland":"Somalia",
 };
 
 /* ---------- DOM refs ---------- */
@@ -183,8 +154,6 @@ const els = {
 /* ---------- Orientation / landscape detection ---------- */
 
 function isLandscape() {
-  // Use window.matchMedia as primary, fall back to dimensions.
-  // This is more reliable than screen.orientation on older iOS Safari.
   if (window.matchMedia) {
     return window.matchMedia("(orientation: landscape)").matches;
   }
@@ -204,33 +173,22 @@ function applySidebarState() {
 els.sidebarToggle.addEventListener("click", () => {
   landscapeSidebarCollapsed = !landscapeSidebarCollapsed;
   applySidebarState();
-  // Give CSS transition time, then recalc map size
   setTimeout(handleResize, 260);
 });
 
 /* ---------- Map setup ---------- */
 
-// These are set/updated by handleResize — always use these, not
-// els.map.clientWidth directly, so the values are consistent within
-// a single frame even if layout hasn't settled yet.
 let width = 0;
 let height = 0;
 
 const svg = d3.select("#map").append("svg");
 const g = svg.append("g");
 const countryLayer = g.append("g").attr("class", "country-layer");
-const disputedLayer = g.append("g").attr("class", "disputed-layer");
 const hitLayer = g.append("g").attr("class", "hit-layer");
 
 const projection = d3.geoNaturalEarth1();
 const path = d3.geoPath(projection);
 
-// V12: raised from 40 so tiny countries (Monaco, Vatican, Singapore) can
-// actually be seen at a usable on-screen size — at 40x Monaco's ~2km width
-// was still sub-millimeter on screen. 400x gets a country like Monaco to
-// roughly a centimeter or more of screen width on a typical phone, since
-// the Natural Earth 50m projection scale means each 10x of zoom roughly
-// 10x's the rendered size of any given shape.
 const MAX_SCALE = 4000;
 
 const zoomBehavior = d3.zoom()
@@ -247,45 +205,30 @@ els.zoomOut.addEventListener("click", () =>
 els.zoomReset.addEventListener("click", () =>
   svg.transition().duration(300).call(zoomBehavior.transform, d3.zoomIdentity));
 
-/* ---------- Resize handler ----------
-   V11: This now does a full re-fit of the projection AND redraws all path
-   data. Previously only the viewBox was updated, which left the projected
-   coordinates of every country unchanged — so in landscape the hit targets
-   were in the wrong place (old portrait coordinates) even though the SVG
-   frame was the right size. We also reset the zoom identity so the user
-   starts fresh after rotation (rather than having a stale pan/zoom that
-   references pre-rotation coordinates). */
+/* ---------- Resize handler ---------- */
 
 function handleResize() {
-  // Read dimensions fresh from the DOM
   width = els.map.clientWidth;
   height = els.map.clientHeight;
-  if (!width || !height) return; // element not yet in layout
+  if (!width || !height) return;
 
   svg.attr("viewBox", `0 0 ${width} ${height}`)
      .attr("width", width)
      .attr("height", height);
 
-  // Re-fit projection to new dimensions, then redraw all paths
   projection.fitSize([width, height], { type: "Sphere" });
 
   countryLayer.selectAll("path.country").attr("d", path);
-  disputedLayer.selectAll("path.disputed-region").attr("d", path);
   hitLayer.selectAll("path.hit-target").attr("d", path);
 
-  // Reset zoom so the stale transform doesn't offset taps
   svg.call(zoomBehavior.transform, d3.zoomIdentity);
 }
 
-// Orientation change: iOS fires this before layout is complete, so we
-// wait 150 ms for the reflow to finish before measuring.
 window.addEventListener("orientationchange", () => {
   setTimeout(handleResize, 150);
 });
 
-// Also respond to plain resize (desktop window resize, split-screen, etc.)
 window.addEventListener("resize", () => {
-  // Use a small debounce so we don't thrash during drag-resize
   clearTimeout(handleResize._t);
   handleResize._t = setTimeout(handleResize, 80);
 });
@@ -346,7 +289,7 @@ d3.json(WORLD_URL).then((world) => {
 
   const keepIndex = [];
   collection.features.forEach((f, i) => {
-    if (f.geometry && f.properties.name !== "Antarctica") keepIndex.push(i);
+    if (f.geometry && f.properties.NAME !== "Antarctica") keepIndex.push(i);
   });
   features = keepIndex.map(i => collection.features[i]);
 
@@ -355,7 +298,7 @@ d3.json(WORLD_URL).then((world) => {
     rawNeighbors[oldI].filter(n => oldToNew.has(n)).map(n => oldToNew.get(n))
   );
 
-  nameOf = features.map(f => f.properties.name);
+  nameOf = features.map(f => f.properties.NAME);
   continentOf = features.map(f => continentFromCentroid(d3.geoCentroid(f)));
 
   const nameToIndex = new Map(nameOf.map((n, i) => [n, i]));
@@ -367,23 +310,11 @@ d3.json(WORLD_URL).then((world) => {
 
   if (!features.length) throw new Error("Zero renderable features after parse.");
 
-  // --- V12: everything below this point is RENDERING, not data-fetching.
-  // Previously drawMap()/handleResize() ran directly inside this .then(),
-  // so any exception they threw — including from the container having
-  // zero width/height on first paint, which can happen on some mobile
-  // browsers before the viewport/webfonts have finished settling — was
-  // caught by the .catch() below and shown as a misleading "map data
-  // failed to load / check your connection" message, even though the
-  // JSON had already fetched and parsed correctly. That's now isolated
-  // into its own try/catch with its own accurate error message, exactly
-  // like the existing history/high-score isolation further down.
   try {
     initialRender();
   } catch (err) {
     console.error("Map data loaded, but rendering failed:", err);
     showToast("map", "bad");
-    // Retry once shortly after — covers the "container had zero size on
-    // first paint" case, which usually resolves itself a moment later.
     setTimeout(() => {
       try {
         initialRender();
@@ -407,12 +338,10 @@ d3.json(WORLD_URL).then((world) => {
   showToast("Map data failed to load — check your connection and reload", "bad");
 });
 
-/* Renders the map for the first time. Separated out so the initial call
-   and the zero-size retry (see above) share identical logic. */
 function initialRender() {
   assignColors();
-  drawMap();      // draw first with whatever dimensions are available…
-  handleResize(); // …then immediately re-fit to the settled container size
+  drawMap();
+  handleResize();
 }
 
 /* ---------- Graph coloring ---------- */
@@ -444,19 +373,13 @@ function assignColors() {
 /* ---------- Draw ---------- */
 
 function drawMap() {
-  // Measure the container now — this is the single source of truth
   width = els.map.clientWidth || window.innerWidth;
   height = els.map.clientHeight || window.innerHeight;
 
-  // QUICK FIX: if the container still isn't laid out yet (both real
-  // measurement and fallback came back 0), bail out and retry shortly
-  // instead of calling fitSize/path with zero/NaN dimensions, which is
-  // what was throwing and triggering the false "failed to draw" message.
   if (!width || !height) {
     setTimeout(() => { try { initialRender(); } catch (e) { console.error(e); } }, 200);
     return;
   }
-
 
   svg.attr("viewBox", `0 0 ${width} ${height}`)
      .attr("width", width)
@@ -464,7 +387,6 @@ function drawMap() {
 
   projection.fitSize([width, height], { type: "Sphere" });
 
-  // --- Visual country layer ---
   countryLayer.selectAll("path.country")
     .data(features)
     .join("path")
@@ -472,19 +394,6 @@ function drawMap() {
     .attr("d", path)
     .attr("fill", d => colorForIndex(d.__colorIndex))
     .attr("data-index", (d, i) => i);
-
-  // --- Hit layer with pointer-based tap detection ---
-  //
-  // V11 KEY FIX: We now convert pointer coordinates from client space into
-  // SVG space using getScreenCTM().inverse(). This accounts for:
-  //   - Any CSS transform on the SVG element itself
-  //   - iOS safe-area insets in landscape (notch/home-bar)
-  //   - Device pixel ratio mismatches
-  //   - d3-zoom's current pan/zoom transform on <g>
-  //
-  // Without this conversion, in landscape on iOS the tap coordinates are
-  // offset by the sidebar width and/or the safe-area inset, so no tap ever
-  // hits the intended feature.
 
   let pointerDownInfo = null;
 
@@ -495,7 +404,6 @@ function drawMap() {
     .attr("d", path)
     .attr("data-index", (d, i) => i)
     .on("pointerdown", (event, d) => {
-      // Convert to SVG-local coordinates immediately on pointerdown
       const svgPoint = clientToSVGPoint(event.clientX, event.clientY);
       pointerDownInfo = {
         svgX: svgPoint.x,
@@ -519,44 +427,21 @@ function drawMap() {
     })
     .on("pointercancel", () => { pointerDownInfo = null; })
     .on("pointerleave", () => { pointerDownInfo = null; });
-
-  // --- Disputed regions overlay ---
-  try {
-    const indiaIndex = features.findIndex(f => f.properties.name === "India");
-    indiaColorIndex = indiaIndex >= 0 ? features[indiaIndex].__colorIndex : 0;
-    disputedLayer.selectAll("path.disputed-region")
-      .data(disputedFeatureCollection.features)
-      .join("path")
-      .attr("class", "disputed-region")
-      .attr("d", path)
-      .attr("fill", colorForIndex(indiaColorIndex));
-  } catch (err) {
-    console.warn("Non-fatal: disputed-region overlay failed.", err);
-  }
 }
 
-/* Convert a client-space coordinate (from a pointer event) into the SVG's
-   own coordinate space. This is the correct way to map a tap to a path on
-   the SVG regardless of page scroll, CSS transforms, device zoom, or
-   landscape safe-area offsets. */
 function clientToSVGPoint(clientX, clientY) {
   const svgEl = svg.node();
   const pt = svgEl.createSVGPoint();
   pt.x = clientX;
   pt.y = clientY;
-  // getScreenCTM maps from SVG user units to screen pixels; the inverse
-  // does the reverse — screen pixels → SVG user units.
   try {
     return pt.matrixTransform(svgEl.getScreenCTM().inverse());
   } catch (e) {
-    // Fallback: just use the raw client coordinates (never ideal, but
-    // at least something will happen rather than silently failing).
     return { x: clientX, y: clientY };
   }
 }
 
-/* ---------- Prompt / stats sync ----------
-   Keep portrait and landscape UI elements in sync. */
+/* ---------- Prompt / stats sync ---------- */
 
 function syncPrompt(name) {
   if (els.promptCountry) els.promptCountry.textContent = name;
@@ -604,9 +489,6 @@ function startGame() {
 
   assignColors();
   countryLayer.selectAll("path.country").attr("fill", d => colorForIndex(d.__colorIndex));
-  const indiaIdxForRepaint = features.findIndex(f => f.properties.name === "India");
-  indiaColorIndex = indiaIdxForRepaint >= 0 ? features[indiaIdxForRepaint].__colorIndex : 0;
-  disputedLayer.selectAll("path.disputed-region").attr("fill", colorForIndex(indiaColorIndex));
 
   game = {
     active: true,
