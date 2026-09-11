@@ -1,5 +1,6 @@
 :root {
   --cream: #F6F2EA;
+  --darkmode: #1C1C1C;
   --paper: #FFFFFF;
   --ink: #24211C;
   --ink-soft: #6B6558;
@@ -23,7 +24,7 @@
 html, body {
   height: 100%;
   margin: 0;
-  background: var(--cream);
+  background: var(--darkmode);
   color: var(--ink);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-tap-highlight-color: transparent;
