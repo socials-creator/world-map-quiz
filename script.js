@@ -448,6 +448,16 @@ function drawMap() {
   width = els.map.clientWidth || window.innerWidth;
   height = els.map.clientHeight || window.innerHeight;
 
+  // QUICK FIX: if the container still isn't laid out yet (both real
+  // measurement and fallback came back 0), bail out and retry shortly
+  // instead of calling fitSize/path with zero/NaN dimensions, which is
+  // what was throwing and triggering the false "failed to draw" message.
+  if (!width || !height) {
+    setTimeout(() => { try { initialRender(); } catch (e) { console.error(e); } }, 200);
+    return;
+  }
+
+
   svg.attr("viewBox", `0 0 ${width} ${height}`)
      .attr("width", width)
      .attr("height", height);
