@@ -118,6 +118,54 @@ html, body {
   margin-left: auto;
 }
 
+/* ========== Mode toggle (Countries / Islands) ========== */
+
+.mode-toggle {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px;
+  background: var(--cream);
+  flex-shrink: 0;
+}
+
+.mode-btn {
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 0.78rem;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.mode-btn:hover { color: var(--ink); }
+
+.mode-btn.active {
+  background: var(--terracotta);
+  color: #fff;
+}
+
+.mode-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.ls-mode-toggle {
+  margin-top: 8px;
+  width: 100%;
+}
+.ls-mode-toggle .mode-btn {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 0.72rem;
+  text-align: center;
+}
+
 .stat { display: flex; flex-direction: column; line-height: 1.2; }
 .stat-label { font-size: 0.62rem; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.06em; }
 .stat-value { font-family: 'Fraunces', serif; font-size: 1rem; font-weight: 600; }
@@ -346,6 +394,17 @@ html, body {
   vector-effect: non-scaling-stroke;
 }
 
+/* Slower, gentler pulse used in Islands mode so a missed/skipped
+   island has time to register before the map moves on. */
+@keyframes revealPulseSlow {
+  0%, 100% { stroke: var(--terracotta-dark); stroke-width: 1; fill-opacity: 1; }
+  50% { stroke: var(--terracotta-dark); stroke-width: 4.5; fill-opacity: 0.72; }
+}
+.country.reveal-pulse-slow {
+  animation: revealPulseSlow 1.1s ease-in-out 3;
+  vector-effect: non-scaling-stroke;
+}
+
 .disputed-region {
   fill-opacity: 0.95;
   stroke: #FBFAF6;
@@ -373,6 +432,14 @@ html, body {
   flex-direction: column;
   align-items: center;
   gap: 5px;
+}
+
+.prompt-label {
+  display: block;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
 }
 
 .prompt-country {

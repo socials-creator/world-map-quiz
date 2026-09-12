@@ -4,6 +4,17 @@ A modern, pinch-zoomable geography game: you're given a country name and you tap
 
 ---
 
+## V14 changes (Islands game mode)
+
+**New: Islands mode.** A mode toggle ("Countries" / "Islands") sits next to New Game in both the portrait control row and the landscape sidebar. Switching modes is disabled mid-round (finish or the buttons stay dimmed) so the quiz pool can't change under you.
+
+- Islands mode quizzes only on island nations and territories — from Australia down through New Zealand, Japan, the UK, the Caribbean islands, and on to smaller Pacific nations like Fiji, Vanuatu, and the Solomon Islands (`ISLAND_NAMES` in `script.js`). Note the underlying map data is a 50m-resolution dataset, so true micro-states like Nauru or Tuvalu don't exist as separate shapes and aren't included.
+- Territories that are normally excluded or folded into their parent in Countries mode (e.g. New Caledonia → France) are quizzed directly as themselves in Islands mode, since the point is identifying the island, not its sovereignty.
+- **Slow-motion reveal:** missing or skipping an island holds the pan/zoom and border-pulse animation roughly 2× longer than Countries mode (`ISLAND_REVEAL_ZOOM_MS` / `ISLAND_REVEAL_HOLD_MS`, plus a gentler `reveal-pulse-slow` CSS keyframe), so there's time to actually register where it was before the round moves on.
+- History and high score are tracked separately per mode (`geoGame.history.v6.islands` / `geoGame.highScore.v6.islands` in `localStorage`), so an Islands streak doesn't overwrite your Countries high score or vice versa.
+
+---
+
 ## V11 changes (landscape iOS fixes + landscape UX overhaul)
 
 **Fixed: taps completely non-functional in landscape on iPhone (webapp).**
@@ -111,7 +122,8 @@ python3 -m http.server 8000
 | Continent jump frequency | `SAME_CONTINENT_PROBABILITY` (0–1) |
 | Tap tolerance | `TAP_MAX_MOVE_PX` / `TAP_MAX_DURATION_MS` |
 | Color palette | `PALETTE` array |
-| Disputed outlines | `DISPUTED_REGIONS` constant |
+| Islands quiz list | `ISLAND_NAMES` set in `script.js` |
+| Islands reveal speed | `ISLAND_REVEAL_ZOOM_MS` / `ISLAND_REVEAL_HOLD_MS` |
 | Fonts / colors | `:root` variables in `style.css` |
 | Landscape sidebar width | `--ls-sidebar-width` CSS variable |
 

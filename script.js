@@ -35,6 +35,12 @@ const SAME_CONTINENT_PROBABILITY = 0.72;
 const REVEAL_ZOOM_MS = 650;
 const REVEAL_HOLD_MS = 1700;
 
+// Islands mode plays the reveal in slow motion — a longer pan/zoom and a
+// longer hold — so a missed or skipped island has time to actually sink in
+// before the round moves on to the next one.
+const ISLAND_REVEAL_ZOOM_MS = 1500;
+const ISLAND_REVEAL_HOLD_MS = 3400;
+
 // Tap detection: these thresholds work for both mouse and touch.
 // We use SVG-space coordinates now (see handlePointerUp) so movement
 // thresholds don't need to compensate for device-pixel-ratio differences.
@@ -108,6 +114,23 @@ const DEPENDENCY_PARENT = {
   "Somaliland":"Somalia",
 };
 
+/* ---------- Islands game mode ---------- */
+
+// Names here must match properties.NAME in world-topo.json exactly.
+// This roughly follows a "biggest to smallest" spread — Australia (the
+// largest landmass entirely surrounded by ocean) down through the island
+// nations of the Pacific — but note the underlying map data only includes
+// islands large enough to render at this resolution, so true micro-states
+// like Nauru or Tuvalu aren't present as separate shapes and can't be
+// included here.
+const ISLAND_NAMES = new Set([
+  "Australia", "New Zealand", "Papua New Guinea", "Indonesia", "Philippines",
+  "Japan", "United Kingdom", "Ireland", "Iceland", "Cuba", "Sri Lanka",
+  "Taiwan", "Madagascar", "Dominican Rep.", "Haiti", "Bahamas", "Jamaica",
+  "Trinidad and Tobago", "Timor-Leste", "Cyprus", "Fiji", "Vanuatu",
+  "Solomon Is.", "New Caledonia",
+]);
+
 /* ---------- DOM refs ---------- */
 
 const els = {
@@ -117,19 +140,25 @@ const els = {
   liveMistakes: document.getElementById("live-mistakes"),
   liveRemaining: document.getElementById("live-remaining"),
   // Portrait prompt
+  promptLabel: document.getElementById("prompt-label"),
   promptCountry: document.getElementById("prompt-country"),
   skipBtn: document.getElementById("skip-btn"),
   newGameBtn: document.getElementById("new-game-btn"),
+  modeCountriesBtn: document.getElementById("mode-countries-btn"),
+  modeIslandsBtn: document.getElementById("mode-islands-btn"),
   // Landscape stats
   lsScore: document.getElementById("ls-score"),
   lsMistakes: document.getElementById("ls-mistakes"),
   lsRemaining: document.getElementById("ls-remaining"),
+  lsPromptLabel: document.getElementById("ls-prompt-label"),
   lsPromptCountry: document.getElementById("ls-prompt-country"),
   lsSkipBtn: document.getElementById("skip-btn-ls"),
   lsNewGameBtn: document.getElementById("new-game-btn-ls"),
   lsPromptSection: document.getElementById("ls-prompt-section"),
   landscapeSidebar: document.getElementById("landscape-sidebar"),
   sidebarToggle: document.getElementById("sidebar-toggle"),
+  modeCountriesBtnLs: document.getElementById("mode-countries-btn-ls"),
+  modeIslandsBtnLs: document.getElementById("mode-islands-btn-ls"),
   // Shared
   feedbackToast: document.getElementById("feedback-toast"),
   highScoreNumber: document.getElementById("high-score-number"),
@@ -264,10 +293,14 @@ let neighborsOf = [];
 let continentOf = [];
 let nameOf = [];
 let sovereignIndices = [];
+let islandIndices = [];
 let parentIndexOf = [];
+
+let currentMode = "countries"; // "countries" | "islands"
 
 let game = {
   active: false,
+  mode: "countries",
   score: 0,
   mistakes: 0,
   targetIndex: null,
@@ -275,9 +308,22 @@ let game = {
   asked: [],
 };
 
+function poolForMode(mode) {
+  return mode === "islands" ? islandIndices : sovereignIndices;
+}
+
 function resolveSovereignIndex(i) {
   const p = parentIndexOf[i];
   return (p !== null && p !== undefined) ? p : i;
+}
+
+// In Countries mode, tapping a dependency (e.g. Puerto Rico) should count
+// as its sovereign parent (the United States). In Islands mode the
+// dependency itself is often the actual quiz target (e.g. New Caledonia),
+// so it must NOT be collapsed into its parent or a correct tap would
+// register as wrong.
+function resolveIndexForMode(i, mode) {
+  return mode === "islands" ? i : resolveSovereignIndex(i);
 }
 
 /* ---------- Load data ---------- */
@@ -307,6 +353,7 @@ d3.json(WORLD_URL).then((world) => {
     return (parentName && nameToIndex.has(parentName)) ? nameToIndex.get(parentName) : null;
   });
   sovereignIndices = features.map((_, i) => i).filter(i => !EXCLUDE_FROM_QUIZ.has(nameOf[i]));
+  islandIndices = features.map((_, i) => i).filter(i => ISLAND_NAMES.has(nameOf[i]));
 
   if (!features.length) throw new Error("Zero renderable features after parse.");
 
@@ -467,6 +514,11 @@ function syncSkipDisabled(disabled) {
   if (els.lsSkipBtn) els.lsSkipBtn.disabled = disabled;
 }
 
+function syncModeButtonsDisabled(disabled) {
+  [els.modeCountriesBtn, els.modeCountriesBtnLs, els.modeIslandsBtn, els.modeIslandsBtnLs]
+    .forEach(btn => { if (btn) btn.disabled = disabled; });
+}
+
 /* ---------- Game flow ---------- */
 
 function doSkip() {
@@ -477,28 +529,61 @@ function doSkip() {
   finishTurn(false);
 }
 
-els.newGameBtn.addEventListener("click", startGame);
-els.lsNewGameBtn.addEventListener("click", startGame);
+els.newGameBtn.addEventListener("click", () => startGame());
+els.lsNewGameBtn.addEventListener("click", () => startGame());
 els.playAgainBtn.addEventListener("click", () => { closeResult(); startGame(); });
 els.closeResultBtn.addEventListener("click", closeResult);
 els.skipBtn.addEventListener("click", doSkip);
 els.lsSkipBtn.addEventListener("click", doSkip);
 
-function startGame() {
-  if (!sovereignIndices.length) return;
+/* ---------- Mode switching ---------- */
+
+function setMode(mode) {
+  if (mode !== "countries" && mode !== "islands") return;
+  currentMode = mode;
+
+  [els.modeCountriesBtn, els.modeCountriesBtnLs].forEach(btn => {
+    if (btn) btn.classList.toggle("active", mode === "countries");
+  });
+  [els.modeIslandsBtn, els.modeIslandsBtnLs].forEach(btn => {
+    if (btn) btn.classList.toggle("active", mode === "islands");
+  });
+
+  const label = mode === "islands" ? "Find this island" : "Find this country";
+  if (els.promptLabel) els.promptLabel.textContent = label;
+  if (els.lsPromptLabel) els.lsPromptLabel.textContent = label;
+
+  loadHighScore();
+  renderHistory();
+}
+
+[els.modeCountriesBtn, els.modeCountriesBtnLs].forEach(btn => {
+  if (btn) btn.addEventListener("click", () => { if (!game.active) setMode("countries"); });
+});
+[els.modeIslandsBtn, els.modeIslandsBtnLs].forEach(btn => {
+  if (btn) btn.addEventListener("click", () => { if (!game.active) setMode("islands"); });
+});
+
+function startGame(mode = currentMode) {
+  const pool = poolForMode(mode);
+  if (!pool.length) return;
+
+  setMode(mode);
 
   assignColors();
   countryLayer.selectAll("path.country").attr("fill", d => colorForIndex(d.__colorIndex));
 
   game = {
     active: true,
+    mode,
     score: 0,
     mistakes: 0,
     targetIndex: null,
-    remaining: sovereignIndices.slice(),
+    remaining: pool.slice(),
     asked: [],
   };
   syncSkipDisabled(false);
+  syncModeButtonsDisabled(true);
   syncStats();
   pickNext();
 }
@@ -531,7 +616,7 @@ function handleCountryClick(clickedIndex) {
   if (clickedIndex === null || clickedIndex === undefined || clickedIndex < 0) return;
 
   const target = game.targetIndex;
-  const resolved = resolveSovereignIndex(clickedIndex);
+  const resolved = resolveIndexForMode(clickedIndex, game.mode);
   const isCorrect = resolved === target;
 
   if (isCorrect) {
@@ -553,10 +638,15 @@ function handleCountryClick(clickedIndex) {
 }
 
 function revealCountry(index) {
+  const slow = game.mode === "islands";
+  const zoomMs = slow ? ISLAND_REVEAL_ZOOM_MS : REVEAL_ZOOM_MS;
+  const holdMs = slow ? ISLAND_REVEAL_HOLD_MS : REVEAL_HOLD_MS;
+  const pulseClass = slow ? "reveal-pulse-slow" : "reveal-pulse";
+
   const feature = features[index];
   const el = countryLayer.select(`path[data-index="${index}"]`);
-  el.raise().classed("reveal-pulse", true);
-  setTimeout(() => el.classed("reveal-pulse", false), REVEAL_HOLD_MS - 50);
+  el.raise().classed(pulseClass, true);
+  setTimeout(() => el.classed(pulseClass, false), holdMs - 50);
 
   const bounds = path.bounds(feature);
   const [[x0, y0], [x1, y1]] = bounds;
@@ -570,7 +660,7 @@ function revealCountry(index) {
   const tx = width / 2 - scale * (x0 + bw / 2);
   const ty = height / 2 - scale * (y0 + bh / 2);
 
-  svg.transition().duration(REVEAL_ZOOM_MS).call(
+  svg.transition().duration(zoomMs).call(
     zoomBehavior.transform,
     d3.zoomIdentity.translate(tx, ty).scale(scale)
   );
@@ -578,7 +668,8 @@ function revealCountry(index) {
 
 function finishTurn(wasCorrect) {
   syncStats();
-  const delay = wasCorrect ? 500 : REVEAL_HOLD_MS;
+  const holdMs = game.mode === "islands" ? ISLAND_REVEAL_HOLD_MS : REVEAL_HOLD_MS;
+  const delay = wasCorrect ? 500 : holdMs;
 
   setTimeout(() => {
     if (game.mistakes >= MAX_MISTAKES) { endGame("mistakes"); return; }
@@ -593,10 +684,12 @@ function finishTurn(wasCorrect) {
 function endGame(reason) {
   game.active = false;
   syncSkipDisabled(true);
+  syncModeButtonsDisabled(false);
   const endEmoji = reason === "completed" ? "🏆" : "🏁";
   syncPrompt(endEmoji);
 
-  saveResult(game.score, game.mistakes, sovereignIndices.length, reason === "completed");
+  const total = poolForMode(game.mode).length;
+  saveResult(game.score, game.mistakes, total, reason === "completed", game.mode);
   showResult(reason);
 }
 
@@ -614,11 +707,13 @@ function showToast(msg, kind) {
 /* ---------- Result overlay ---------- */
 
 function showResult(reason) {
+  const noun = game.mode === "islands" ? "island" : "country";
+  const total = poolForMode(game.mode).length;
   els.resultTitle.textContent =
-    reason === "completed" ? "You placed every country!" : "Game over — 5 misses";
-  els.resultScore.textContent = `${game.score} / ${sovereignIndices.length}`;
+    reason === "completed" ? `You placed every ${noun}!` : "Game over — 5 misses";
+  els.resultScore.textContent = `${game.score} / ${total}`;
   els.resultCopy.textContent = reason === "completed"
-    ? "Every country on the map, found. That's a full round."
+    ? `Every ${noun} on the map, found. That's a full round.`
     : "Every round sharpens your map sense. Go again?";
   els.resultOverlay.classList.add("show");
 }
@@ -641,50 +736,66 @@ let memoryHighScore = 0;
   }
 })();
 
-function readHistory() {
-  if (!storageAvailable) return memoryHistory;
-  try { return JSON.parse(localStorage.getItem(STORAGE_HISTORY_KEY) || "[]"); }
-  catch (err) { return memoryHistory; }
+// Islands mode keeps its own history + high score, separate from Countries
+// mode, so switching modes doesn't clobber either scoreboard. Countries
+// mode keeps the original (unsuffixed) keys so existing players' saved
+// scores carry over unchanged.
+let memoryHistoryByMode = { countries: [], islands: [] };
+let memoryHighScoreByMode = { countries: 0, islands: 0 };
+
+function historyKey(mode) {
+  return mode === "islands" ? `${STORAGE_HISTORY_KEY}.islands` : STORAGE_HISTORY_KEY;
+}
+function highKey(mode) {
+  return mode === "islands" ? `${STORAGE_HIGH_KEY}.islands` : STORAGE_HIGH_KEY;
 }
 
-function writeHistory(history) {
-  memoryHistory = history;
+function readHistory(mode = currentMode) {
+  if (!storageAvailable) return memoryHistoryByMode[mode] || [];
+  try { return JSON.parse(localStorage.getItem(historyKey(mode)) || "[]"); }
+  catch (err) { return memoryHistoryByMode[mode] || []; }
+}
+
+function writeHistory(history, mode = currentMode) {
+  memoryHistoryByMode[mode] = history;
   if (!storageAvailable) return;
-  try { localStorage.setItem(STORAGE_HISTORY_KEY, JSON.stringify(history)); }
+  try { localStorage.setItem(historyKey(mode), JSON.stringify(history)); }
   catch (err) { console.warn("Could not save history.", err); }
 }
 
-function readHighScore() {
-  if (!storageAvailable) return memoryHighScore;
-  try { return Number(localStorage.getItem(STORAGE_HIGH_KEY) || 0); }
-  catch (err) { return memoryHighScore; }
+function readHighScore(mode = currentMode) {
+  if (!storageAvailable) return memoryHighScoreByMode[mode] || 0;
+  try { return Number(localStorage.getItem(highKey(mode)) || 0); }
+  catch (err) { return memoryHighScoreByMode[mode] || 0; }
 }
 
-function writeHighScore(value) {
-  memoryHighScore = value;
+function writeHighScore(value, mode = currentMode) {
+  memoryHighScoreByMode[mode] = value;
   if (!storageAvailable) return;
-  try { localStorage.setItem(STORAGE_HIGH_KEY, String(value)); }
+  try { localStorage.setItem(highKey(mode), String(value)); }
   catch (err) { console.warn("Could not save high score.", err); }
 }
 
-function saveResult(score, mistakes, total, completed) {
-  const history = readHistory();
+function saveResult(score, mistakes, total, completed, mode = currentMode) {
+  const history = readHistory(mode);
   history.unshift({ score, mistakes, total, completed, date: new Date().toISOString() });
-  writeHistory(history.slice(0, 10));
-  const high = readHighScore();
-  if (score > high) writeHighScore(score);
+  writeHistory(history.slice(0, 10), mode);
+  const high = readHighScore(mode);
+  if (score > high) writeHighScore(score, mode);
   renderHistory();
   loadHighScore();
 }
 
 function loadHighScore() {
-  const high = readHighScore();
+  const high = readHighScore(currentMode);
+  const total = poolForMode(currentMode).length;
+  const noun = currentMode === "islands" ? "islands" : "countries";
   els.highScoreNumber.textContent = high;
-  els.highScoreOutof.textContent = `of ${sovereignIndices.length || "—"} countries`;
+  els.highScoreOutof.textContent = `of ${total || "—"} ${noun}`;
 }
 
 function renderHistory() {
-  const history = readHistory();
+  const history = readHistory(currentMode);
   const empty = `<li class="history-empty">No games yet.</li>`;
   if (!history.length) {
     els.historyListPortrait.innerHTML = empty;

@@ -28,6 +28,10 @@
   <div class="portrait-controls">
     <div class="control-row">
       <button class="btn-primary" id="new-game-btn">New game</button>
+      <div class="mode-toggle" role="group" aria-label="Game mode">
+        <button class="mode-btn active" id="mode-countries-btn" data-mode="countries">Countries</button>
+        <button class="mode-btn" id="mode-islands-btn" data-mode="islands">Islands 🏝</button>
+      </div>
       <div class="live-stats">
         <div class="stat"><span class="stat-label">Found</span><span class="stat-value" id="live-score">0</span></div>
         <div class="stat"><span class="stat-label">Missed</span><span class="stat-value" id="live-mistakes">0 / 5</span></div>
@@ -50,10 +54,14 @@
     <aside class="landscape-sidebar" id="landscape-sidebar">
       <div class="ls-section">
         <button class="btn-primary ls-new-game" id="new-game-btn-ls">New game</button>
+        <div class="mode-toggle ls-mode-toggle" role="group" aria-label="Game mode">
+          <button class="mode-btn active" id="mode-countries-btn-ls" data-mode="countries">Countries</button>
+          <button class="mode-btn" id="mode-islands-btn-ls" data-mode="islands">Islands 🏝</button>
+        </div>
       </div>
 
       <div class="ls-section ls-prompt-section" id="ls-prompt-section">
-        <div class="ls-label">Find this country</div>
+        <div class="ls-label" id="ls-prompt-label">Find this country</div>
         <div class="ls-country" id="ls-prompt-country">🌍</div>
         <button class="skip-chip ls-skip" id="skip-btn-ls" disabled>Skip →</button>
       </div>
@@ -84,6 +92,7 @@
     <main class="map-stage">
       <!-- Portrait prompt card (hidden in landscape) -->
       <div class="prompt-card portrait-only" id="prompt-card">
+        <span class="prompt-label" id="prompt-label">Find this country</span>
         <span class="prompt-country" id="prompt-country">🌍</span>
         <button class="skip-chip" id="skip-btn" disabled>Skip →</button>
       </div>
@@ -118,6 +127,19 @@
           You stay in one continent for a bit, then occasionally jump somewhere new.
           Miss or skip one, and the map pans to show you where it was. End the round
           by finding every country, or after 5 misses — whichever comes first.
+        </p>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel-title">Islands mode 🏝</h2>
+        <p class="panel-copy" id="islands-panel-copy">
+          Switch to <strong>Islands</strong> with the toggle next to New game.
+          You'll only be asked about island nations and territories — everything
+          from Australia (the largest landmass surrounded entirely by water) down
+          to the smaller island nations scattered across the Pacific, like Vanuatu,
+          Fiji, and the Solomon Islands. When you miss or skip one, the reveal
+          plays slower and holds longer than in Countries mode, so there's time
+          to actually place it before the round moves on.
         </p>
       </section>
 
